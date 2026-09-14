@@ -1,0 +1,438 @@
+// 自媒体创作者工作台 — Prisma Schema
+// 数据库：PostgreSQL 17（Orbstack 容器）
+// 版本：v1.1 — 完善高亮位置、enum、关系约束、内容格式定义
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ===== 用户 =====
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String   @unique
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  topics            Topic[]
+  articles          Article[]
+  notes             Note[]
+  comments          Comment[]
+  contentMetrics    ContentMetric[]
+  knowledgeNodes    KnowledgeNode[]
+  dailyDigestConfig DailyDigestConfig?
+}
+
+// ===== 知识图谱节点 =====
+model KnowledgeNode {
+  id          String              @id @default(cuid())
+  title       String
+  description String?             @db.Text
+  content     String?             @db.Text
+  type        String // article | note | concept | material
+  tags        String[]
+  parentId    String?
+  parent      KnowledgeNode?      @relation("KnowledgeTree", fields: [parentId], references: [id])
+  children    KnowledgeNode[]     @relation("KnowledgeTree")
+  relations   KnowledgeRelation[] @relation("fromNode")
+  relationsTo KnowledgeRelation[] @relation("toNode")
+  userId      String
+  user        User                @relation(fields: [userId], references: [id])
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([parentId])
+  @@index([type])
+}
+
+// ===== 知识节点间的关系 =====
+model KnowledgeRelation {
+  id        String        @id @default(cuid())
+  fromId    String
+  toId      String
+  type      String // references | related | parent | depends | opposite
+  fromNode  KnowledgeNode @relation("fromNode", fields: [fromId], references: [id], onDelete: Cascade)
+  toNode    KnowledgeNode @relation("toNode", fields: [toId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@unique([fromId, toId, type])
+  @@index([fromId])
+  @@index([toId])
+}
+
+// ===== 选题 =====
+model Topic {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  @db.Text
+  angles      String[]
+  status      String   @default("draft") // draft | active | done | abandoned
+  heat        Int      @default(0)
+  source      String? // comment | knowledge | manual
+  sourceId    String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联评论（反向关系）
+  comments Comment[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ===== 文章/阅读物 =====
+// content 格式：Markdown 纯文本，渲染时转 HTML
+// url 按 userId + url 唯一（非全局唯一），支持多用户
+model Article {
+  id              String           @id @default(cuid())
+  title           String
+  url             String? // 来源 URL（非全局唯一，按 userId 唯一见下方约束）
+  content         String?          @db.Text // Markdown 纯文本
+  contentVersion  Int              @default(1) // 内容版本号，原文变化后用于恢复高亮
+  summary         String?          @db.Text
+  source          String? // rss | import | manual | daily
+  tags            String[]
+  readingProgress Float            @default(0) // 0-100
+  lastReadAt      DateTime?
+  isDailyDigest   Boolean          @default(false)
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+  highlights      Highlight[]
+  notes           Note[]
+  knowledgeChunks KnowledgeChunk[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // 按 userId + url 唯一（而非全局唯一）
+  @@unique([userId, url])
+  @@index([userId])
+  @@index([isDailyDigest])
+}
+
+// ===== 标注/高亮 =====
+// 存储位置信息（前后文锚点 + 字符偏移量），原文变化时可恢复
+model Highlight {
+  id          String   @id @default(cuid())
+  text        String   @db.Text // 选中原文
+  color       String   @default("yellow") // yellow | green | blue | pink
+  note        String?  @db.Text // 标注时的笔记（与笔记一体）
+  // 位置信息（原文变化时可恢复高亮）
+  prefix      String // 前锚点（选中文字前 50 字）
+  suffix      String // 后锚点（选中文字后 50 字）
+  startOffset Int? // 字符偏移量（辅助定位）
+  endOffset   Int? // 字符偏移量
+  articleId   String
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([articleId])
+}
+
+// ===== 笔记 =====
+model Note {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  quote     String?  @db.Text // 批注锚定的原文（用于正文回标）
+  articleId String?
+  article   Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([articleId])
+}
+
+// ===== 评论 =====
+model Comment {
+  id             String   @id @default(cuid())
+  content        String   @db.Text
+  platform       String // bilibili | douyin | weixin | xiaohongshu
+  author         String
+  platformId     String?
+  sentiment      String? // positive | negative | neutral
+  keywordTags    String[]
+  relatedTopicId String? // 关联的选题
+  // 关系约束：relatedTopicId 必须指向真实存在的 Topic
+  relatedTopic   Topic?   @relation(fields: [relatedTopicId], references: [id], onDelete: SetNull)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([platform])
+  @@index([sentiment])
+  @@index([relatedTopicId])
+}
+
+// ===== 内容数据 =====
+model ContentMetric {
+  id         String   @id @default(cuid())
+  title      String
+  platform   String
+  platformId String?
+  views      Int      @default(0)
+  likes      Int      @default(0)
+  comments   Int      @default(0)
+  shares     Int      @default(0)
+  followers  Int      @default(0)
+  recordedAt DateTime
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([userId, platform, recordedAt])
+  @@index([platform])
+}
+
+// ===== 每日精读配置 =====
+// userId 加外键约束（非仅 @unique）
+model DailyDigestConfig {
+  id        String   @id @default(cuid())
+  count     Int      @default(3)
+  strategy  String   @default("mixed") // hot | random | preference
+  sources   String[]
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ===== 随手记：便利贴灵感捕捉 =====
+model QuickNote {
+  id        String   @id @default(cuid())
+  content   String
+  status    String   @default("inbox") // inbox | organized
+  tags      String[] @default([])
+  images    String[] @default([]) // vault 相对路径
+  vaultPath String? // 采纳整理后写入的 vault 笔记路径
+  aiMeta    String? // AI 整理建议 JSON {summary, tags, folder}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ===== 题库机：每日题集状态与作答 =====
+model QuizSetState {
+  id            String    @id // YYYY-MM-DD
+  status        String    @default("pending") // pending | doing | done
+  reminderStage Int       @default(0)
+  lastNudgedAt  DateTime?
+  completedAt   DateTime?
+  updatedAt     DateTime  @updatedAt
+}
+
+model QuizAnswer {
+  id        String   @id @default(cuid())
+  setId     String
+  qIndex    Int
+  choice    String
+  correct   Boolean
+  updatedAt DateTime @updatedAt
+
+  @@unique([setId, qIndex])
+}
+
+// ===== 错题本：手动收录的错题 =====
+model QuizWrong {
+  id        String   @id @default(cuid())
+  setId     String // 题集日期 YYYY-MM-DD
+  qIndex    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([setId, qIndex])
+  @@index([setId])
+}
+
+// ===== 每日热点：aihot TOP 10 当日缓存 =====
+model DailyHot {
+  id        String   @id // YYYY-MM-DD（本地日期）
+  items     Json
+  fetchedAt DateTime
+}
+
+// ===== 头脑风暴：与 AI 围绕一个问题推演的会话 =====
+model BrainstormSession {
+  id               String          @id @default(cuid())
+  question         String
+  title            String?         // 根据首轮交流自动提炼的短标题；question 始终保留完整问题
+  mode             String          @default("reasoning") // reasoning | knowledge
+  knowledgeSpaceId String?
+  knowledgeSpace   KnowledgeSpace? @relation(fields: [knowledgeSpaceId], references: [id], onDelete: SetNull)
+  groundingPolicy  String          @default("strict") // strict | assisted
+  citations        Json            @default("[]") // [{id,articleId,path,title,startOffset,endOffset,quote}]
+  status           String          @default("active") // active | done
+  propositions     Json            @default("[]") // 命题台账 [{id,text,status,boundary,decision}]
+  routes           Json            @default("[]") // 探索路线 [{id,text,status}]
+  references       Json            @default("[]") // 挂载参考 [{id,type,title,articleId?,path?}]
+  summary          String? // 结束时的会话总结
+  increments       Int             @default(0) // 知识增量（写回 vault 次数）
+  incrementLog     Json            @default("[]") // 写回记录 [{title,path,at}]
+  decisions        Json            @default("[]") // 用户对 AI 选项/提问的选择 [{id,choice,label,q,at}]
+  messages         Json            @default("[]") // ChatTurn[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([mode])
+  @@index([knowledgeSpaceId])
+}
+
+// ===== 知识库问答：可复用的来源空间与可引用片段 =====
+model KnowledgeSpace {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  isDefault   Boolean  @default(false)
+  scope       Json     @default("{\"type\":\"vault\",\"folders\":[],\"articleIds\":[]}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  brainstormSessions BrainstormSession[]
+
+  @@index([isDefault])
+}
+
+model KnowledgeChunk {
+  id          String   @id @default(cuid())
+  articleId   String
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  vaultPath   String?
+  title       String
+  chunkIndex  Int
+  content     String   @db.Text
+  startOffset Int
+  endOffset   Int
+  contentHash String
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([articleId, chunkIndex])
+  @@index([articleId])
+  @@index([vaultPath])
+  @@index([contentHash])
+}
+
+// ===== Dawn Agent：本地项目、会话时间线与人工审批 =====
+model DawnAgentProject {
+  id           String   @id @default(cuid())
+  name         String
+  rootPath     String
+  realPath     String   @unique
+  trustLevel   String   @default("standard") // standard | elevated
+  enabled      Boolean  @default(true)
+  lastOpenedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions DawnAgentSession[]
+  memories DawnAgentMemory[]
+  handoffs DawnAgentHandoff[]
+
+  @@index([lastOpenedAt])
+}
+
+model DawnAgentSession {
+  id             String           @id @default(cuid())
+  projectId      String
+  project        DawnAgentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title          String
+  status         String           @default("idle") // idle | running | awaiting_approval | stopped | error
+  piSessionFile  String?
+  model          String?
+  thinkingLevel  String           @default("high")
+  permissionMode String           @default("supervised") // supervised | full_control
+  summary        String?          @db.Text
+  context        Json? // 从阅读、知识库或头脑风暴交接来的可追溯上下文
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  events    DawnAgentEvent[]
+  approvals DawnAgentApproval[]
+  handoffs  DawnAgentHandoff[]
+
+  @@index([projectId, updatedAt])
+  @@index([status])
+}
+
+model DawnAgentEvent {
+  id        String           @id @default(cuid())
+  sessionId String
+  session   DawnAgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sequence  Int
+  type      String // user | assistant | tool_start | tool_update | tool_end | status | error
+  payload   Json
+  createdAt DateTime         @default(now())
+
+  @@unique([sessionId, sequence])
+  @@index([sessionId, createdAt])
+}
+
+model DawnAgentApproval {
+  id            String           @id @default(cuid())
+  sessionId     String
+  session       DawnAgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  toolCallId    String
+  toolName      String
+  riskLevel     String           @default("medium")
+  arguments     Json
+  preview       Json? // 文件修改前后对比；不保存未截断的完整敏感内容
+  selectedHunks Json? // edit 工具允许用户只批准部分编辑块
+  summary       String
+  status        String           @default("pending") // pending | approved | denied | expired
+  decidedAt     DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([sessionId, toolCallId])
+  @@index([sessionId, status])
+}
+
+model DawnAgentMemory {
+  id         String           @id @default(cuid())
+  projectId  String
+  project    DawnAgentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title      String
+  content    String           @db.Text
+  kind       String           @default("fact") // fact | decision | preference | workflow
+  sourceType String           @default("manual") // manual | session | knowledge | handoff
+  sourceRef  String?
+  enabled    Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([projectId, enabled, updatedAt])
+}
+
+model DawnAgentHandoff {
+  id           String            @id @default(cuid())
+  sourceType   String // reading-selection | reading-document | knowledge | reasoning
+  sourceTitle  String
+  sourcePath   String?
+  sourceRef    String?
+  selectedText String?           @db.Text
+  context      String?           @db.Text
+  instruction  String?           @db.Text
+  metadata     Json?
+  status       String            @default("pending") // pending | accepted | dismissed
+  projectId    String?
+  project      DawnAgentProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  sessionId    String?
+  session      DawnAgentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  acceptedAt   DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([status, createdAt])
+  @@index([projectId, createdAt])
+  @@index([sessionId])
+}
