@@ -1,175 +1,107 @@
-# 晨光知识库 / DawnKB
+<p align="center">
+  <img src="./assets/readme/hero.svg" width="100%" alt="DawnKB 晨光知识库：把 Obsidian、深度阅读与知识关系连在一起的本地知识工作台，首版链路为导入文章、阅读高亮、AI 理解、入库 Obsidian">
+</p>
 
-> 一个把 Obsidian、深度阅读、知识关系与内容复盘连在一起的本地知识工作台
+# DawnKB · 晨光知识库
 
----
+一个跑在本机的知识工作台：把 **Obsidian 笔记、深度阅读、知识图谱、内容复盘与每日刷题** 连成一条链路。
+文章导入后在网页里精读，选中文字即可高亮、笔记、让 AI 解释，确认后写回 Obsidian；笔记之间的关系自动织成图谱。
 
-## 项目简介
+## 看一眼真实界面
 
-将知识获取、阅读消化、选题策划、评论洞察、数据复盘全链路工具整合到一个网页工作台。
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="./assets/readme/reader.png" width="100%" alt="阅读器界面：文章正文、选区操作与批注侧栏">
+      <br><sub>阅读器：选中即高亮 / 笔记 / AI 理解</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="./assets/readme/quiz.png" width="100%" alt="题库机界面：左侧每日题集列表，右侧题目卡与解析">
+      <br><sub>题库机：每日题集 + 提醒升级 + 错题本</sub>
+    </td>
+  </tr>
+</table>
 
-**首版 MVP 链路**：导入文章 → 阅读 → 高亮/笔记 → AI 理解 → 人工确认入库 Obsidian → 搜索复用
+## 它解决什么
 
-**核心差异化**：
-1. 阅读器 + AI 一体化体验：选中后可理解、笔记、高亮或入库，AI 回答可保存为笔记
-2. 知识图谱可视化：从"文件列表"升级为"关系网络"
-3. 评论 → 选题闭环：从用户反馈中发现创作方向
-4. 每日精读：信息过载时代的"帮你选好"
-5. 数据聚合：各平台数据集中展示
+知识工具散落的痛点：阅读在浏览器、笔记在 Obsidian、复盘在表格、刷题在 App。
+DawnKB 把这些动作收进一个网页工作台，**Obsidian 仍是唯一事实源**——网页只是它的读写界面与关系层。
 
----
+首版 MVP 链路：
+
+```text
+导入文章 → 阅读 → 高亮/笔记 → AI 理解 → 人工确认入库 Obsidian → 搜索复用
+```
+
+## 差异点（机制，不是口号）
+
+| 能力 | 机制 |
+|------|------|
+| 阅读器 + AI 一体 | 选中文本弹出操作条：理解、笔记、高亮、入库；AI 回答可一键存为笔记 |
+| 知识图谱 | 解析 wikilink 与正文共现，从「文件列表」升级为可交互关系网络 |
+| 评论 → 选题闭环 | 抓取各平台评论，聚类出可写的选题方向 |
+| 每日精读 | 聚合订阅源，每天帮你选好一篇并生成导读 |
+| 软考题库机 | 每天 9:00 由本地 agent 从知识库随机抽知识点出 5 题；提醒按 3h→2h→1h→30min 升级；错题手动收录进错题本 |
+| 数据聚合 | 各创作平台的阅读/互动数据集中复盘 |
+
+## 快速启动
+
+前置：Node 20+、本地 PostgreSQL（或 Orbstack/Docker）、Obsidian vault 路径。
+
+```bash
+git clone https://github.com/chenguang-jiang/personal_workbench.git
+cd personal_workbench
+npm install
+
+cp .env.example .env.local   # 填入 DATABASE_URL 与 OBSIDIAN_VAULT_PATH
+npm run db:generate
+npm run db:migrate           # 或 db:push 按 schema 直接同步
+npm run db:seed              # 可选：示例数据
+
+npm run dev                  # http://localhost:3000
+```
+
+Obsidian 同步（监听 vault 变化、增量入库）：
+
+```bash
+npm run obsidian:sync
+```
+
+## 功能地图
+
+- **工作台总览**：今日待办、知识增量、数据卡片
+- **阅读器**：Obsidian 文章网页化精读，高亮/笔记/批注侧栏，内嵌题块可勾选与收录错题
+- **知识图谱**：空间/节点/关系三层可视化
+- **随手记 / 头脑风暴**：碎片捕获与 AI 推演
+- **每日热点 / 每日精读**：信号聚合与导读
+- **题库机**：每日题集、完成标记、提醒升级、错题本
+- **Dawn Agent / DeepSeek 工作台**：本地 agent 会话与 harness 接入
 
 ## 技术栈
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| Next.js | 16.3.0 | 前端 + API（App Router） |
-| React | 19.2 | |
-| Tailwind CSS | v4 | 暗色主题设计系统 |
-| Prisma | 7.9.1 | ORM（adapter 模式） |
-| PostgreSQL | 17 | 数据库（Orbstack 容器） |
+| Next.js | 16.3 | App Router，前端 + API |
+| React | 19.2 | UI |
+| Tailwind CSS | v4 | 设计系统 |
+| Prisma | 7.9 | ORM（pg adapter） |
+| PostgreSQL | 17 | 存储 |
 | Zustand | 5.x | 状态管理 |
 | AI SDK | 7.x | 流式 AI 输出 |
-| Ollama | — | 本地 AI 模型（可选） |
+| Ollama | — | 本地模型（可选） |
 
----
+## 仓库结构
 
-## 快速启动
-
-### 前置要求
-
-- **Node.js** ≥ 18（推荐 20+）
-- **Orbstack**（或 Docker）— 用于跑 PostgreSQL
-- **Ollama**（可选，AI 功能需要）— [安装](https://ollama.com)
-
-### 1. 启动 PostgreSQL
-
-```bash
-docker run -d --name workbench-postgres \
-  -e POSTGRES_USER=workbench \
-  -e POSTGRES_PASSWORD=workbench \
-  -e POSTGRES_DB=workbench \
-  -p 5433:5432 \
-  -v workbench-pg-data:/var/lib/postgresql/data \
-  postgres:17-alpine
+```text
+src/app/            页面与 API 路由（reading、quiz、graph、brainstorm…）
+src/components/     阅读器、图谱等交互组件
+src/lib/            解析/同步/序列化/题库核心逻辑
+prisma/             schema 与迁移
+docs/               设计文档与实施计划
+assets/readme/      README 视觉资产
 ```
 
-### 2. 配置环境变量
+## 说明
 
-```bash
-cp .env.example .env
-# .env 内容已预置，按需修改
-```
-
-关键变量：
-- `DATABASE_URL` — PostgreSQL 连接串（默认 `localhost:5433`）
-- `OPENAI_API_KEY` — 可选，配置则用云端 AI，否则用本地 Ollama
-- `OLLAMA_HOST` — 本地 Ollama 地址（默认 `http://localhost:11434`）
-- `OBSIDIAN_VAULT_PATH` — 本地 Obsidian Vault 绝对路径；配置后服务器启动即做差异同步，保存 `.md` 后约 0.5 秒增量更新
-
-### 3. 安装依赖 + 初始化数据库
-
-```bash
-npm install
-npm run db:generate    # 生成 Prisma Client
-npm run db:migrate     # 创建数据库表
-npm run db:seed        # 种子数据（示例文章 + 知识节点）
-```
-
-### 4. 启动 Ollama（可选，AI 功能需要）
-
-```bash
-ollama pull qwen2.5:7b
-ollama serve
-```
-
-### 5. 启动开发服务器
-
-```bash
-npm run dev
-```
-
-浏览器打开 `http://localhost:3000`，自动跳转到工作台大屏。
-
----
-
-## 常用命令
-
-| 命令 | 说明 |
-|------|------|
-| `npm run dev` | 启动开发服务器（localhost:3000） |
-| `npm run build` | 生产构建 |
-| `npm run db:migrate` | 数据库迁移 |
-| `npm run db:generate` | 生成 Prisma Client |
-| `npm run db:seed` | 种子数据 |
-| `npm run db:studio` | Prisma Studio（数据库可视化管理） |
-| `npm run obsidian:sync` | 手动执行一次 Obsidian 全量差异同步 |
-| `npm run lint` | ESLint 检查 |
-
----
-
-## 目录结构
-
-```
-personal_workbench/
-├── docs/
-│   ├── design-document.md       ← 完整设计方案
-│   ├── frontend-styling.md     ← 前端样式规范
-│   └── implementation-plan.md  ← 分阶段落地计划（含验收标准）
-├── prisma/
-│   ├── schema.prisma            ← 数据库 Schema
-│   └── migrations/             ← 迁移文件
-├── prisma.config.ts            ← Prisma 7 配置
-├── src/
-│   ├── app/                     ← Next.js App Router
-│   │   ├── layout.tsx          ← 根布局
-│   │   ├── globals.css         ← DawnKB 设计系统与跨页面转场
-│   │   ├── dashboard/          ← 工作台大屏
-│   │   ├── reading/            ← 阅读器（列表/新建/详情）
-│   │   ├── daily/              ← 每日精读
-│   │   ├── comments/           ← 评论区
-│   │   ├── data/               ← 数据看板
-│   │   ├── settings/           ← 设置
-│   │   └── api/                ← API Routes
-│   │       ├── ai/             ← AI API（explain/translate/summarize）
-│   │       ├── articles/       ← 文章 CRUD
-│   │       ├── highlights/     ← 高亮 CRUD
-│   │       └── notes/          ← 笔记 CRUD
-│   ├── components/
-│   │   ├── layout/             ← 侧边栏
-│   │   └── reading/            ← 阅读器组件（Reader/AnnotationDesk/HighlightToolbar）
-│   └── lib/
-│       ├── prisma.ts           ← Prisma 客户端
-│       ├── ai.ts               ← AI 工具函数
-│       ├── obsidian-sync.ts    ← Obsidian 差异同步核心
-│       ├── obsidian-vault.ts   ← 真实目录浏览与安全路径约束
-│       ├── vault-watcher.ts    ← Vault 实时监听与状态
-│       ├── utils.ts            ← 通用工具
-│       └── seed.ts             ← 种子数据
-├── .env / .env.example
-└── package.json
-```
-
----
-
-## 文档入口
-
-- [设计方案](docs/design-document.md) — 功能、技术选型、数据库、AI、部署
-- [落地计划](docs/implementation-plan.md) — 分阶段进度、MVP 范围、验收标准
-- [前端样式](docs/frontend-styling.md) — 色彩、排版、组件、动画
-
----
-
-## 部署架构
-
-纯本地部署，不做 Vercel：
-
-```
-浏览器 → Next.js (localhost:3000) → PostgreSQL (Orbstack :5433)
-                                  → Ollama (localhost:11434，可选)
-                                  → Obsidian Vault（启动校准 + 保存时增量同步）
-```
-
-阅读器“入库”会在选定的现有 Vault 目录中新建 Markdown，并立即触发该文件的增量同步；不会覆盖同名文件。直接在 Obsidian 中保存 `.md` 时，由服务端 watcher 在文件稳定约 500ms 后更新 DawnKB。未运行 DawnKB 服务时，下一次启动校准或手动执行 `npm run obsidian:sync` 会补齐变化。
-
-详见 [设计方案 §8](docs/design-document.md#8-部署架构)。
+- 个人项目，数据全部留在本机；仓库不含任何密钥与 `.env`
+- 题集与笔记内容在私有 Obsidian vault，不在本仓库

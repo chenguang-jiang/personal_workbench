@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="360" viewBox="0 0 1200 360"
+     role="img" aria-labelledby="hero-title hero-desc">
+  <title id="hero-title">DawnKB 晨光知识库</title>
+  <desc id="hero-desc">本地知识工作台：文章导入、深度阅读、AI 理解、Obsidian 入库与知识图谱的一条链路。</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbfafc"/>
+      <stop offset="1" stop-color="#f3effc"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7c05a"/>
+      <stop offset="1" stop-color="#f2a93b"/>
+    </linearGradient>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="#6d4bd2"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="360" rx="28" fill="url(#bg)"/>
+
+  <!-- 左侧：logo mark（日出 + 展开书页） -->
+  <g transform="translate(64,60) scale(1.4)">
+    <circle cx="32" cy="27" r="8" fill="url(#sun)"/>
+    <path fill="#6d4bd2" d="M7 27.5c9.9-2.3 18.2.25 25 7.6V56c-7.15-5.35-15.5-7.45-25-6.2V27.5Z"/>
+    <path fill="#6d4bd2" d="M57 26.5c-9.65-1.65-18 1.2-25 8.6V56c7.4-5.15 15.75-7.25 25-6.3V26.5Z"/>
+    <path d="M32 35.5v19" stroke="#fbfafc" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+
+  <!-- 左侧：标题与价值主张 -->
+  <text x="176" y="104" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif"
+        font-size="44" font-weight="700" fill="#241d3a">DawnKB · 晨光知识库</text>
+  <text x="178" y="146" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif"
+        font-size="20" fill="#6b5a94">把 Obsidian、深度阅读与知识关系</text>
+  <text x="178" y="176" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif"
+        font-size="20" fill="#6b5a94">连在一起的本地知识工作台</text>
+
+  <!-- 左侧：能力 chips -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="19" font-weight="600">
+    <rect x="178" y="204" width="132" height="40" rx="20" fill="#ffffff" stroke="#d9d0f0"/>
+    <text x="202" y="230" fill="#6d4bd2">深度阅读器</text>
+    <rect x="322" y="204" width="112" height="40" rx="20" fill="#ffffff" stroke="#d9d0f0"/>
+    <text x="346" y="230" fill="#6d4bd2">知识图谱</text>
+    <rect x="446" y="204" width="132" height="40" rx="20" fill="#ffffff" stroke="#d9d0f0"/>
+    <text x="466" y="230" fill="#6d4bd2">软考题库机</text>
+  </g>
+
+  <!-- 左侧底部：技术栈一行 -->
+  <text x="178" y="292" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif"
+        font-size="18" fill="#8a7bab">Next.js 16 · React 19 · Prisma + PostgreSQL · 本地 AI 可选</text>
+
+  <!-- 右侧：主链路流程（项目原生 motif：书页节点 + 晨光连线） -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <rect x="700" y="56" width="436" height="248" rx="20" fill="#ffffff" stroke="#e4dcf5"/>
+    <text x="728" y="98" font-size="20" font-weight="700" fill="#241d3a">首版 MVP 链路</text>
+
+    <!-- 节点 -->
+    <g font-size="20" font-weight="600" fill="#3a2f5c">
+      <rect x="728" y="120" width="150" height="46" rx="12" fill="#f3effc" stroke="#6d4bd2"/>
+      <text x="763" y="149">导入文章</text>
+      <rect x="902" y="120" width="170" height="46" rx="12" fill="#f3effc" stroke="#6d4bd2"/>
+      <text x="947" y="149">阅读高亮</text>
+      <rect x="728" y="206" width="150" height="46" rx="12" fill="#f3effc" stroke="#6d4bd2"/>
+      <text x="767" y="235">AI 理解</text>
+      <rect x="902" y="206" width="170" height="46" rx="12" fill="#fff6e6" stroke="#f2a93b"/>
+      <text x="907" y="235">入库 Obsidian</text>
+    </g>
+
+    <!-- 连线箭头：导入→阅读→AI→入库 -->
+    <g stroke="#6d4bd2" stroke-width="2.4" fill="none" stroke-linecap="round">
+      <path d="M878 143h24" marker-end="url(#arr)"/>
+      <path d="M987 166v14H803v18" marker-end="url(#arr)"/>
+      <path d="M878 229h24" marker-end="url(#arr)"/>
+    </g>
+
+    <text x="728" y="286" font-size="18" fill="#6b5a94">选中即理解 · 笔记/高亮/入库 · 关系成网</text>
+  </g>
+</svg>
