@@ -383,3 +383,242 @@
 .import-hub-panel[hidden] {
   display: none !important;
 }
+
+/* ── 全能智能导入工作台补充样式 ── */
+.ai-import-header-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: color-mix(in oklab, var(--color-surface) 90%, var(--color-elevated));
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12.5px;
+}
+
+.ai-import-header-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-secondary);
+}
+
+.ai-import-badge-warning {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+  font-size: 11.5px;
+}
+
+.ai-import-drop-active {
+  background: color-mix(in oklab, var(--color-accent-purple) 6%, var(--color-surface)) !important;
+  outline: 2px dashed var(--color-accent-purple);
+  outline-offset: -8px;
+}
+
+.ai-import-turn-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ai-import-doc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-primary);
+}
+
+.ai-import-doc-pill small {
+  color: var(--color-tertiary);
+}
+
+.ai-import-doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-primary);
+  font-size: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.ai-import-doc-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-import-doc-chip small {
+  color: var(--color-tertiary);
+}
+
+.ai-import-doc-chip button {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-elevated);
+  color: var(--color-secondary);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.ai-import-doc-chip button:hover {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+/* 语言要求与自定义指令区 */
+.ai-import-req-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--color-surface) 94%, var(--color-elevated));
+  border: 1px dashed var(--color-border);
+}
+
+.ai-import-req-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-secondary);
+}
+
+.ai-import-req-input {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 12.5px;
+  outline: none;
+  transition: border-color 150ms ease;
+}
+
+.ai-import-req-input:focus {
+  border-color: var(--color-accent-purple);
+}
+
+.ai-import-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-import-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.ai-import-preset-chip:hover {
+  border-color: var(--color-accent-purple);
+  color: var(--color-accent-purple-dark);
+  background: var(--color-accent-lilac);
+}
+
+.ai-import-direct-btn {
+  background: linear-gradient(135deg, var(--color-accent-purple) 0%, var(--color-accent-purple-dark) 100%) !important;
+  color: #fff !important;
+  border: 0 !important;
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--color-accent-purple) 25%, transparent);
+}
+
+.ai-import-direct-btn:hover {
+  filter: brightness(1.08);
+}
+
+.ai-import-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  color: var(--color-tertiary);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.ai-import-clear-btn:hover {
+  color: var(--color-danger);
+}
+
+/* 归档成功卡片 */
+.ai-import-success-card {
+  margin: 16px 0;
+  padding: 18px 22px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklab, var(--color-success) 35%, var(--color-border));
+  background: color-mix(in oklab, var(--color-success) 6%, var(--color-surface));
+}
+
+.ai-import-success-card.is-error {
+  border-color: color-mix(in oklab, var(--color-danger) 35%, var(--color-border));
+  background: color-mix(in oklab, var(--color-danger) 6%, var(--color-surface));
+}
+
+.ai-import-success-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ai-import-success-head h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.ai-import-success-body {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--color-secondary);
+}
+
+.ai-import-success-body code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-elevated);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.ai-import-success-status {
+  margin-top: 8px;
+  color: var(--color-success);
+  font-size: 12px;
+}
+
+.ai-import-success-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}

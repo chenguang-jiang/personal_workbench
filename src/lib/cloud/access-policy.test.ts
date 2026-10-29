@@ -50,6 +50,8 @@ describe("cloud access policy", () => {
     assert.deepEqual(decideCloudAccess("PATCH", "/api/articles/abc", authed), { kind: "allow" });
     assert.deepEqual(decideCloudAccess("PATCH", "/api/articles/abc/", authed), { kind: "allow" });
     assert.deepEqual(decideCloudAccess("POST", "/api/articles/abc/favorite", authed), { kind: "allow" });
+    assert.deepEqual(decideCloudAccess("POST", "/api/articles/abc/ai-edit", authed), { kind: "allow" });
+    assert.deepEqual(decideCloudAccess("POST", "/api/articles/abc/tidy", authed), { kind: "allow" });
     assert.deepEqual(decideCloudAccess("POST", "/api/articles/new", authed), { kind: "allow" });
     // 删除文章：云端 Vault 是独立挂载卷，阅读器内删除需可用（含 ?vault=1 删源文件）
     assert.deepEqual(decideCloudAccess("DELETE", "/api/articles/abc", authed), { kind: "allow" });

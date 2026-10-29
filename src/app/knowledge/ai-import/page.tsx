@@ -7,9 +7,9 @@ export default function AiImportPage() {
   return (
     <div className="page-frame page-frame--wide ai-import-page">
       <PageHeader
-        eyebrow="IMPORT"
-        title="把内容收进知识库"
-        description="四种方式随你挑：和 AI 聊着归档，或直接上传文档、粘贴正文、给出链接——归档后搜索、知识关系和索引页都会同步更新。"
+        eyebrow="AI IMPORT"
+        title="全能智能导入"
+        description="支持上传文档与图片附件、粘贴文本或网页链接，外加自定义语言要求与整理提示，AI 自动完成结构化归档与索引更新。"
       />
       <ImportHub />
     </div>

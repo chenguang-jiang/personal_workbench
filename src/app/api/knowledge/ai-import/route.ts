@@ -64,6 +64,19 @@ function asMessages(value: unknown): AiImportMessage[] | null {
       }
       if (record.images.length > 0) message.images = record.images;
     }
+    // 文档附件只接受包含 name 和 content 的文本对象
+    if (record.documents !== undefined) {
+      if (!Array.isArray(record.documents) || record.documents.length > 10) return null;
+      const docs: Array<{ name: string; content: string }> = [];
+      for (const doc of record.documents) {
+        if (!doc || typeof doc !== "object") return null;
+        const d = doc as Record<string, unknown>;
+        if (typeof d.name !== "string" || typeof d.content !== "string") return null;
+        if (d.name.length > 255 || d.content.length > 100_000) return null;
+        docs.push({ name: d.name, content: d.content });
+      }
+      if (docs.length > 0) message.documents = docs;
+    }
     if (record.source && typeof record.source === "object") {
       const source = record.source as Record<string, unknown>;
       if (

@@ -876,6 +876,94 @@
   max-height: 140px;
   resize: none;
   font-size: 12px;
+  flex: 1;
+}
+
+.ai-chat-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.ai-chat-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-attach-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-secondary);
+}
+
+.ai-attach-btn:hover {
+  color: var(--color-accent-purple);
+  border-color: var(--color-accent-purple);
+}
+
+.ai-chat-attach-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ai-chat-attach-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-tertiary);
+}
+
+.ai-chat-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 11px;
+  color: var(--color-primary);
+  max-width: 180px;
+}
+
+.ai-chat-attach-chip img {
+  width: 22px;
+  height: 22px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.ai-chat-attach-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-chat-attach-chip button {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-elevated);
+  color: var(--color-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ai-chat-attach-chip button:hover {
+  background: var(--color-danger);
+  color: #fff;
 }
 
 /* AI 修改稿预览卡：先预览再应用，应用走 PATCH 并进入可撤销快照 */

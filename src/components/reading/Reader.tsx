@@ -1220,8 +1220,8 @@ export function Reader({
                         ? "reader-icon-button reader-icon-button--active"
                         : "reader-icon-button"
                     }
-                    title="AI 对话（引用本文，可让 AI 修改文章）"
-                    aria-label="AI 对话"
+                    title="AI 助手（支持上传附件、提问与改写整理）"
+                    aria-label="AI 助手与整理"
                   >
                     <BotMessageSquare aria-hidden="true" />
                   </button>

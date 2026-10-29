@@ -5,7 +5,9 @@ import {
   ArrowUp,
   BotMessageSquare,
   Check,
+  FileText,
   Loader2,
+  Paperclip,
   PenLine,
   X,
 } from "lucide-react";
@@ -14,6 +16,16 @@ import { renderMiniMarkdown } from "@/lib/mini-markdown";
 export type AiChatSelection = { text: string; context: string } | null;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+
+type ChatAttachment = {
+  id: string;
+  name: string;
+  type: "image" | "document";
+  preview?: string;
+  content?: string;
+  ref?: string;
+  size: number;
+};
 
 /** 每条 AI 回答只在完成后才走 Markdown 渲染；流式中的消息保持纯文本避免闪烁 */
 const AnswerBody = memo(function AnswerBody({ content }: { content: string }) {
@@ -50,6 +62,9 @@ export function ReaderAiChat({
   const [pendingEdit, setPendingEdit] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState("");
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [attaching, setAttaching] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   // 进入面板时的选区固定为本轮引用；不随正文新选区漂移
   const [quoted] = useState(selection);
   const listRef = useRef<HTMLDivElement>(null);
@@ -63,6 +78,79 @@ export function ReaderAiChat({
   // 卸载时掐断未完成的流
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  async function handleFiles(files: File[]) {
+    if (streaming || proposing || applying || attaching || files.length === 0) return;
+    setError("");
+    const availableSlots = 4 - attachments.length;
+    if (availableSlots <= 0) {
+      setError("每轮对话最多附加 4 个附件");
+      return;
+    }
+
+    setAttaching(true);
+    try {
+      for (const file of files.slice(0, availableSlots)) {
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        if (file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name)) {
+          if (file.size > 4 * 1024 * 1024) {
+            setError(`图片 ${file.name} 超过 4MB，已跳过`);
+            continue;
+          }
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = () => reject(new Error(`读取图片失败: ${file.name}`));
+            reader.readAsDataURL(file);
+          });
+          const response = await fetch("/api/knowledge/ai-import/attach-images", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ images: [dataUrl] }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "图片保存失败");
+          const saved = (data.images as Array<{ name: string; ref: string }>)[0];
+          setAttachments((prev) => [
+            ...prev,
+            {
+              id,
+              name: saved.name,
+              type: "image",
+              preview: dataUrl,
+              ref: saved.ref,
+              size: file.size,
+            },
+          ]);
+        } else {
+          if (file.size > 2 * 1024 * 1024) {
+            setError(`文档 ${file.name} 超过 2MB，已跳过`);
+            continue;
+          }
+          const text = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ""));
+            reader.onerror = () => reject(new Error(`读取文档失败: ${file.name}`));
+            reader.readAsText(file);
+          });
+          setAttachments((prev) => [
+            ...prev,
+            {
+              id,
+              name: file.name,
+              type: "document",
+              content: text.replace(/^\uFEFF/, ""),
+              size: file.size,
+            },
+          ]);
+        }
+      }
+    } catch (attachErr) {
+      setError(attachErr instanceof Error ? attachErr.message : "附件处理失败");
+    } finally {
+      setAttaching(false);
+    }
+  }
+
   // 打开面板即预填的问题（如“总结全文”的预设提问）自动发送一次
   const autoSentRef = useRef(false);
   useEffect(() => {
@@ -75,16 +163,33 @@ export function ReaderAiChat({
 
   async function send(text: string) {
     const question = text.trim();
-    if (!question || streaming || proposing || applying) return;
+    if ((!question && attachments.length === 0) || streaming || proposing || applying || attaching) return;
+    const currentAttachments = attachments;
+    setAttachments([]);
+
     if (mode === "edit") {
-      await proposeEdit(question);
+      await proposeEdit(question, currentAttachments);
       return;
     }
+
+    let userPrompt = question;
+    if (currentAttachments.length > 0) {
+      const docTexts = currentAttachments
+        .filter((a) => a.type === "document" && a.content)
+        .map((a) => `【附带文档（${a.name}）】：\n${a.content!.slice(0, 8000)}`)
+        .join("\n\n");
+      const imgTexts = currentAttachments
+        .filter((a) => a.type === "image")
+        .map((a) => `【附带图片】：${a.name}`)
+        .join("、");
+      userPrompt = [question, docTexts, imgTexts].filter(Boolean).join("\n\n");
+    }
+
     const history = [
       ...messages,
       {
         role: "user" as const,
-        content: quoted?.text ? `关于这段原文：「${quoted.text.slice(0, 300)}」\n\n${question}` : question,
+        content: quoted?.text ? `关于这段原文：「${quoted.text.slice(0, 300)}」\n\n${userPrompt}` : userPrompt,
       },
     ];
     setMessages(history);
@@ -137,8 +242,9 @@ export function ReaderAiChat({
   }
 
   // 修改模式：拿回完整修改稿，先预览，应用交给父组件走 PATCH + 可撤销
-  async function proposeEdit(instruction: string) {
-    setMessages((current) => [...current, { role: "user", content: instruction }]);
+  async function proposeEdit(instruction: string, activeAttachments: ChatAttachment[] = []) {
+    const summary = instruction || (activeAttachments.length ? `根据上传的 ${activeAttachments.length} 个附件修改文章` : "修改文章");
+    setMessages((current) => [...current, { role: "user", content: summary }]);
     setInput("");
     setError("");
     setProposing(true);
@@ -146,7 +252,16 @@ export function ReaderAiChat({
       const response = await fetch(`/api/articles/${articleId}/ai-edit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instruction, selection: quoted?.text ?? "" }),
+        body: JSON.stringify({
+          instruction: instruction || "请参考上传的附件内容对文章进行相应修改与补充",
+          selection: quoted?.text ?? "",
+          attachments: activeAttachments.map((att) => ({
+            name: att.name,
+            type: att.type,
+            content: att.content,
+            ref: att.ref,
+          })),
+        }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error || "AI 修改失败");
@@ -176,14 +291,14 @@ export function ReaderAiChat({
     }
   }
 
-  const canSend = input.trim().length > 0 && !streaming && !proposing && !applying;
+  const canSend = (input.trim().length > 0 || attachments.length > 0) && !streaming && !proposing && !applying && !attaching;
 
   return (
-    <aside className="ai-assistant" aria-label="AI 对话">
+    <aside className="ai-assistant" aria-label="AI 助手与整理">
       <div className="reader-panel-header">
         <h2>
           <BotMessageSquare aria-hidden="true" />
-          AI 对话 · 引用本文
+          AI 助手 · 整理与对话
         </h2>
         <button type="button" className="reader-panel-close" onClick={onClose} aria-label="关闭 AI 对话">
           <X aria-hidden="true" />
@@ -200,7 +315,7 @@ export function ReaderAiChat({
         {messages.length === 0 && !pendingEdit && (
           <div className="ai-empty">
             <BotMessageSquare aria-hidden="true" />
-            <p>围绕这篇文章提问，或切到「修改」让 AI 直接改写文章内容。</p>
+            <p>可上传图片或文档附件，让 AI 参考附件回答问题，或直接改写、扩写与整理文章。</p>
           </div>
         )}
         {messages.map((message, index) =>
@@ -265,43 +380,105 @@ export function ReaderAiChat({
             onClick={() => setMode("edit")}
             disabled={streaming || proposing}
           >
-            修改文章
+            修改与整理文章
           </button>
         </div>
+
+        {(attachments.length > 0 || attaching) && (
+          <div className="ai-chat-attach-bar">
+            {attaching && (
+              <span className="ai-chat-attach-pending">
+                <Loader2 size={13} className="ai-spinner" aria-hidden="true" />
+                <span>附件处理中…</span>
+              </span>
+            )}
+            {attachments.map((att) => (
+              <span key={att.id} className="ai-chat-attach-chip">
+                {att.type === "image" && att.preview ? (
+                  <img src={att.preview} alt={att.name} />
+                ) : (
+                  <FileText size={13} aria-hidden="true" />
+                )}
+                <span className="ai-chat-attach-name" title={att.name}>
+                  {att.name}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`移除附件 ${att.name}`}
+                  onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== att.id))}
+                  disabled={streaming || proposing || applying}
+                >
+                  <X size={11} aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
         <form
           onSubmit={(event) => {
             event.preventDefault();
             void send(input);
           }}
         >
-          <textarea
-            className="textarea ai-input"
-            value={input}
-            rows={2}
-            placeholder={
-              mode === "ask"
-                ? quoted?.text
-                  ? "针对引用的原文提问…"
-                  : "问这篇文章相关的问题…"
-                : "说明要怎么改，例如：把开头两段合并成一段，语气更直接…"
-            }
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void send(input);
+          <div className="ai-chat-input-row">
+            <textarea
+              className="textarea ai-input"
+              value={input}
+              rows={2}
+              placeholder={
+                mode === "ask"
+                  ? quoted?.text
+                    ? "针对引用的原文提问，可附加图片/文档…"
+                    : "问这篇文章相关的问题，可附加图片/文档…"
+                  : "说明要怎么修改，可结合上传的图片或文档附件…"
               }
-            }}
-          />
-          <button type="submit" className="button ai-send" disabled={!canSend} aria-label="发送">
-            {streaming || proposing ? (
-              <Loader2 className="ai-spinner" aria-hidden="true" />
-            ) : mode === "edit" ? (
-              <PenLine aria-hidden="true" />
-            ) : (
-              <ArrowUp aria-hidden="true" />
-            )}
-          </button>
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void send(input);
+                }
+              }}
+            />
+            <div className="ai-chat-actions">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.md,.txt,.json,.csv,.pdf,text/*"
+                className="sr-only"
+                aria-label="上传附件"
+                onChange={(e) => {
+                  void handleFiles(Array.from(e.target.files || []));
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                className="button button-secondary ai-attach-btn"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={streaming || proposing || applying || attaching || attachments.length >= 4}
+                title="上传图片或文档附件（辅助修改或问答）"
+                aria-label="上传附件"
+              >
+                {attaching ? (
+                  <Loader2 size={15} className="ai-spinner" aria-hidden="true" />
+                ) : (
+                  <Paperclip size={15} aria-hidden="true" />
+                )}
+              </button>
+              <button type="submit" className="button ai-send" disabled={!canSend} aria-label="发送">
+                {streaming || proposing ? (
+                  <Loader2 className="ai-spinner" aria-hidden="true" />
+                ) : mode === "edit" ? (
+                  <PenLine aria-hidden="true" />
+                ) : (
+                  <ArrowUp aria-hidden="true" />
+                )}
+              </button>
+            </div>
+          </div>
         </form>
       </div>
     </aside>

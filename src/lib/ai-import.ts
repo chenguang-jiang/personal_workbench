@@ -24,11 +24,18 @@ export type AiImportSource = {
   content: string;
 };
 
+export type AiImportDocument = {
+  name: string;
+  content: string;
+};
+
 export type AiImportMessage = ChatTurn & {
   /** 该轮用户消息附带的网页抓取结果 */
   source?: AiImportSource;
   /** 该轮附带的图片附件文件名（已存 vault assets 目录，随文章以 ![[名]] 引用） */
   images?: string[];
+  /** 该轮附带的文档附件（Markdown、文本、代码等，已提取正文文本） */
+  documents?: AiImportDocument[];
 };
 
 function sourceBlock(source: AiImportSource): string {
@@ -60,6 +67,12 @@ async function historyForModel(messages: AiImportMessage[], limit = Infinity): P
     let content = message.source
       ? `${sourceBlock(message.source)}\n\n用户说：\n${message.content}`
       : message.content;
+    if (message.documents && message.documents.length > 0) {
+      const docBlocks = message.documents
+        .map((doc) => `【用户附带的参考文档：${doc.name}】\n${doc.content.slice(0, 30_000)}`)
+        .join("\n\n");
+      content = `${content}\n\n${docBlocks}`;
+    }
     const names = message.images ?? [];
     if (names.length > 0) {
       const refs = names.map((name) => `![[${name}]]`).join("、");
@@ -96,9 +109,9 @@ export type AiImportDraft = {
 };
 
 const GENERATE_SYSTEM = [
-  "你是知识库写作助手。根据对话历史（含用户提供的网页原文）产出一篇独立成篇的 Markdown 文章。",
-  "要求：中文；以 # 标题 开头；结构清晰（小节用 ##，要点用列表，关键结论可加粗）；把网页原文的干货与对话中用户的理解、追问和结论都吸收进来；",
-  "文末加一行「> 来源：<链接>」（有多个链接时逐行列出）；对话中若出现附带的图片文件名，在正文合适位置用 ![[文件名]] 嵌入图片；不要复述对话过程，不要写「用户问」「AI 答」。",
+  "你是知识库写作助手。根据对话历史（含用户提供的参考文档、网页原文与自定义要求）产出一篇独立成篇的结构化 Markdown 文章。",
+  "要求：以 # 标题 开头；结构清晰（小节用 ##，要点用列表，关键结论可加粗）；把文档与网页原文的干货吸收进来；严格遵循用户的语言要求（如翻译、双语、中文提炼等）与整理指令；",
+  "文末若有网页来源加一行「> 来源：<链接>」（有多个链接时逐行列出）；对话中若出现附带的图片文件名，在正文合适位置用 ![[文件名]] 嵌入图片；不要复述对话过程，不要写「用户问」「AI 答」。",
   "只输出 JSON：{\"title\": string, \"summary\": string, \"content\": string}。title 不超过 40 字、不含 Markdown 与 .md 后缀；summary 为一句话（不超过 60 字）说明这篇讲什么；content 为完整 Markdown 正文。",
 ].join("\n");
 

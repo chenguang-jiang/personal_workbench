@@ -15,7 +15,16 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
-  const body = await readJsonObject<{ instruction?: string; selection?: string }>(req);
+  const body = await readJsonObject<{
+    instruction?: string;
+    selection?: string;
+    attachments?: Array<{
+      name?: string;
+      type?: "document" | "image";
+      content?: string;
+      ref?: string;
+    }>;
+  }>(req);
   if (!body) return invalidJsonResponse();
   const instruction = body.instruction?.trim();
   if (!instruction) {
@@ -39,6 +48,19 @@ export async function POST(
   }
 
   const selection = body.selection?.trim();
+  const attachmentBlocks: string[] = [];
+  if (Array.isArray(body.attachments)) {
+    for (const att of body.attachments) {
+      if (!att || typeof att !== "object") continue;
+      const name = typeof att.name === "string" ? att.name : "未命名附件";
+      if (att.type === "document" && typeof att.content === "string") {
+        attachmentBlocks.push(`【用户附带的参考文档：${name}】\n${att.content.slice(0, 15_000)}`);
+      } else if (att.type === "image" && typeof att.ref === "string") {
+        attachmentBlocks.push(`【用户附带的图片已存入知识库，引用标记：${att.ref}（文件名：${name}）】\n若修改要求插入或引用该图，请在正文相应位置嵌入 ${att.ref}。`);
+      }
+    }
+  }
+
   try {
     const proposed = await chatOnce({
       system: [
@@ -47,6 +69,7 @@ export async function POST(
         "代码块、mermaid 图、表格、链接、图片、wikilink 除指令明确要求外一律原样保留；",
         "直接输出修改后的完整 Markdown，不要解释，不要把全文包进 ``` 代码围栏。",
         selection ? "用户同时引用了一段原文，指令里的“这段/它”等指代以引用的原文为准。" : "",
+        attachmentBlocks.length > 0 ? "用户附带了参考文档或图片附件，请结合附件内容修改，或按指示在合适位置嵌入 ![[图片名]]。" : "",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -56,6 +79,7 @@ export async function POST(
           content: [
             `文章标题：${article.title}`,
             selection ? `引用的原文（附前后文）：\n${selection}` : "",
+            attachmentBlocks.length > 0 ? attachmentBlocks.join("\n\n") : "",
             `修改指令：${instruction}`,
             `文章全文：\n\n${original}`,
           ]

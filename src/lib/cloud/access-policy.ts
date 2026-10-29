@@ -62,6 +62,8 @@ const CLOUD_LIMITED_WRITE_ROUTES = [
   { method: "PATCH", pattern: /^\/api\/articles\/[^/]+$/ },
   { method: "POST", pattern: /^\/api\/articles\/[^/]+\/favorite$/ },
   { method: "POST", pattern: /^\/api\/articles\/[^/]+\/share$/ },
+  { method: "POST", pattern: /^\/api\/articles\/[^/]+\/ai-edit$/ },
+  { method: "POST", pattern: /^\/api\/articles\/[^/]+\/tidy$/ },
   { method: "POST", pattern: /^\/api\/articles\/new$/ },
   { method: "DELETE", pattern: /^\/api\/articles\/[^/]+$/ },
 ];
