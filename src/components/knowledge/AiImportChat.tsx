@@ -52,6 +52,29 @@ const ATTACH_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
 const ATTACH_DOC_MAX_BYTES = 2 * 1024 * 1024;
 const ATTACH_MAX_COUNT = 8;
 
+function extractClipboardFiles(clipboardData: DataTransfer | null): File[] {
+  if (!clipboardData) return [];
+  const files: File[] = [];
+  if (clipboardData.files && clipboardData.files.length > 0) {
+    for (let i = 0; i < clipboardData.files.length; i++) {
+      const file = clipboardData.files[i];
+      if (file) files.push(file);
+    }
+  }
+  if (clipboardData.items && clipboardData.items.length > 0) {
+    for (let i = 0; i < clipboardData.items.length; i++) {
+      const item = clipboardData.items[i];
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file && !files.some((f) => f.name === file.name && f.size === file.size)) {
+          files.push(file);
+        }
+      }
+    }
+  }
+  return files;
+}
+
 function trimSource(source: Source): Source {
   return source.content.length > SOURCE_SEND_MAX
     ? { ...source, content: source.content.slice(0, SOURCE_SEND_MAX) }
@@ -197,6 +220,25 @@ export function AiImportChat() {
       setError(attachError instanceof Error ? attachError.message : "附件处理失败");
     } finally {
       setAttaching(false);
+    }
+  }
+
+  function handlePaste(event: React.ClipboardEvent) {
+    const files = extractClipboardFiles(event.clipboardData);
+    if (files.length > 0) {
+      event.preventDefault();
+      void handleFiles(files);
+      return;
+    }
+    const isInputFocused =
+      document.activeElement?.tagName === "TEXTAREA" ||
+      document.activeElement?.tagName === "INPUT";
+    if (!isInputFocused) {
+      const text = event.clipboardData?.getData("text/plain");
+      if (text) {
+        event.preventDefault();
+        setInput((prev) => (prev ? `${prev}\n${text}` : text));
+      }
     }
   }
 
@@ -463,7 +505,7 @@ export function AiImportChat() {
   const canGenerate = turns.some((turn) => turn.role === "assistant" && turn.content.trim());
 
   return (
-    <section className="ai-import-panel panel" aria-label="AI 智能导入">
+    <section className="ai-import-panel panel" onPaste={handlePaste} aria-label="AI 智能导入">
       <div
         className={`ai-import-thread ${dragging ? "ai-import-drop-active" : ""}`}
         ref={threadRef}
@@ -684,20 +726,11 @@ export function AiImportChat() {
             className="ai-import-main-input"
             rows={3}
             value={input}
-            placeholder="粘贴正文、Markdown 文本、输入网页公开链接 (https://...)，或直接拖拽文件到这里…"
+            placeholder="粘贴正文、Markdown 文本、输入网页公开链接 (https://...)，或直接按 Cmd+V 粘贴截图/拖入文件…"
             aria-label="导入内容或对话"
             disabled={busy}
             onChange={(event) => setInput(event.target.value)}
-            onPaste={(event) => {
-              const files = Array.from(event.clipboardData?.items ?? [])
-                .filter((item) => item.type.startsWith("image/"))
-                .map((item) => item.getAsFile())
-                .filter((file): file is File => Boolean(file));
-              if (files.length > 0) {
-                event.preventDefault();
-                void handleFiles(files);
-              }
-            }}
+            onPaste={handlePaste}
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault();

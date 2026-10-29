@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { chatOnce, getAiStatus } from "@/lib/ai";
+import { loadAttachedImage } from "@/lib/cloud/import-assets";
 import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 // 与一键整理同一上限：超长文档一次交不全模型，返回稿会截断丢内容
@@ -23,6 +24,7 @@ export async function POST(
       type?: "document" | "image";
       content?: string;
       ref?: string;
+      dataUrl?: string;
     }>;
   }>(req);
   if (!body) return invalidJsonResponse();
@@ -49,14 +51,23 @@ export async function POST(
 
   const selection = body.selection?.trim();
   const attachmentBlocks: string[] = [];
+  const visionImages: string[] = [];
   if (Array.isArray(body.attachments)) {
     for (const att of body.attachments) {
       if (!att || typeof att !== "object") continue;
       const name = typeof att.name === "string" ? att.name : "未命名附件";
       if (att.type === "document" && typeof att.content === "string") {
         attachmentBlocks.push(`【用户附带的参考文档：${name}】\n${att.content.slice(0, 15_000)}`);
-      } else if (att.type === "image" && typeof att.ref === "string") {
-        attachmentBlocks.push(`【用户附带的图片已存入知识库，引用标记：${att.ref}（文件名：${name}）】\n若修改要求插入或引用该图，请在正文相应位置嵌入 ${att.ref}。`);
+      } else if (att.type === "image") {
+        if (typeof att.ref === "string") {
+          attachmentBlocks.push(`【用户附带的图片已存入知识库，引用标记：${att.ref}（文件名：${name}）】\n若修改要求插入或引用该图，请在正文相应位置嵌入 ${att.ref}。`);
+        }
+        if (typeof att.dataUrl === "string" && att.dataUrl.startsWith("data:image/")) {
+          visionImages.push(att.dataUrl);
+        } else if (typeof att.name === "string") {
+          const loaded = loadAttachedImage(att.name);
+          if (loaded) visionImages.push(loaded);
+        }
       }
     }
   }
@@ -85,6 +96,7 @@ export async function POST(
           ]
             .filter(Boolean)
             .join("\n\n"),
+          images: visionImages.length > 0 ? visionImages : undefined,
         },
       ],
       maxTokens: 8000,

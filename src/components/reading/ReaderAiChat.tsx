@@ -15,8 +15,6 @@ import { renderMiniMarkdown } from "@/lib/mini-markdown";
 
 export type AiChatSelection = { text: string; context: string } | null;
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
-
 type ChatAttachment = {
   id: string;
   name: string;
@@ -26,6 +24,35 @@ type ChatAttachment = {
   ref?: string;
   size: number;
 };
+
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  attachments?: ChatAttachment[];
+};
+
+function extractClipboardFiles(clipboardData: DataTransfer | null): File[] {
+  if (!clipboardData) return [];
+  const files: File[] = [];
+  if (clipboardData.files && clipboardData.files.length > 0) {
+    for (let i = 0; i < clipboardData.files.length; i++) {
+      const file = clipboardData.files[i];
+      if (file) files.push(file);
+    }
+  }
+  if (clipboardData.items && clipboardData.items.length > 0) {
+    for (let i = 0; i < clipboardData.items.length; i++) {
+      const item = clipboardData.items[i];
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file && !files.some((f) => f.name === file.name && f.size === file.size)) {
+          files.push(file);
+        }
+      }
+    }
+  }
+  return files;
+}
 
 /** 每条 AI 回答只在完成后才走 Markdown 渲染；流式中的消息保持纯文本避免闪烁 */
 const AnswerBody = memo(function AnswerBody({ content }: { content: string }) {
@@ -151,6 +178,27 @@ export function ReaderAiChat({
     }
   }
 
+  const [dragging, setDragging] = useState(false);
+
+  function handlePaste(event: React.ClipboardEvent) {
+    const files = extractClipboardFiles(event.clipboardData);
+    if (files.length > 0) {
+      event.preventDefault();
+      void handleFiles(files);
+      return;
+    }
+    const isInputFocused =
+      document.activeElement?.tagName === "TEXTAREA" ||
+      document.activeElement?.tagName === "INPUT";
+    if (!isInputFocused) {
+      const text = event.clipboardData?.getData("text/plain");
+      if (text) {
+        event.preventDefault();
+        setInput((prev) => (prev ? `${prev}\n${text}` : text));
+      }
+    }
+  }
+
   // 打开面板即预填的问题（如“总结全文”的预设提问）自动发送一次
   const autoSentRef = useRef(false);
   useEffect(() => {
@@ -162,10 +210,26 @@ export function ReaderAiChat({
   }, []);
 
   async function send(text: string) {
-    const question = text.trim();
+    let question = text.trim();
     if ((!question && attachments.length === 0) || streaming || proposing || applying || attaching) return;
     const currentAttachments = attachments;
     setAttachments([]);
+
+    if (!question && currentAttachments.length > 0) {
+      if (mode === "edit") {
+        question = "请参考附带的图片/文档内容，对文章进行相应修改与补充。";
+      } else {
+        const hasImg = currentAttachments.some((a) => a.type === "image");
+        const hasDoc = currentAttachments.some((a) => a.type === "document");
+        if (hasImg && hasDoc) {
+          question = "请结合我附带的图片与文档，分析并回答相关问题。";
+        } else if (hasImg) {
+          question = "请帮我分析这张图片的内容，并结合文章进行解答。";
+        } else {
+          question = "请阅读附带的文档内容，并结合文章进行解答。";
+        }
+      }
+    }
 
     if (mode === "edit") {
       await proposeEdit(question, currentAttachments);
@@ -180,26 +244,44 @@ export function ReaderAiChat({
         .join("\n\n");
       const imgTexts = currentAttachments
         .filter((a) => a.type === "image")
-        .map((a) => `【附带图片】：${a.name}`)
+        .map((a) => `【附带图片】：${a.name}（引用标记：${a.ref || a.name}）`)
         .join("、");
       userPrompt = [question, docTexts, imgTexts].filter(Boolean).join("\n\n");
     }
 
-    const history = [
-      ...messages,
+    const currentImages = currentAttachments
+      .filter((a) => a.type === "image" && a.preview)
+      .map((a) => a.preview!);
+
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: quoted?.text ? `关于这段原文：「${quoted.text.slice(0, 300)}」\n\n${userPrompt}` : userPrompt,
+      attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
+    };
+
+    const historyForModel = [
+      ...messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        images: m.attachments
+          ?.filter((a) => a.type === "image" && a.preview)
+          .map((a) => a.preview!),
+      })),
       {
         role: "user" as const,
-        content: quoted?.text ? `关于这段原文：「${quoted.text.slice(0, 300)}」\n\n${userPrompt}` : userPrompt,
+        content: userMessage.content,
+        images: currentImages.length > 0 ? currentImages : undefined,
       },
     ];
-    setMessages(history);
+
+    setMessages([...messages, userMessage]);
     setInput("");
     setError("");
     setStreaming(true);
     const controller = new AbortController();
     abortRef.current = controller;
     let answer = "";
-    setMessages([...history, { role: "assistant", content: "" }]);
+    setMessages([...messages, userMessage, { role: "assistant", content: "" }]);
     try {
       const response = await fetch("/api/ai/ask", {
         method: "POST",
@@ -209,7 +291,7 @@ export function ReaderAiChat({
           articleTitle,
           articleContent,
           selection: quoted?.text ?? "",
-          history,
+          history: historyForModel,
         }),
       });
       if (!response.ok || !response.body) {
@@ -244,7 +326,12 @@ export function ReaderAiChat({
   // 修改模式：拿回完整修改稿，先预览，应用交给父组件走 PATCH + 可撤销
   async function proposeEdit(instruction: string, activeAttachments: ChatAttachment[] = []) {
     const summary = instruction || (activeAttachments.length ? `根据上传的 ${activeAttachments.length} 个附件修改文章` : "修改文章");
-    setMessages((current) => [...current, { role: "user", content: summary }]);
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: summary,
+      attachments: activeAttachments.length > 0 ? activeAttachments : undefined,
+    };
+    setMessages((current) => [...current, userMessage]);
     setInput("");
     setError("");
     setProposing(true);
@@ -260,6 +347,7 @@ export function ReaderAiChat({
             type: att.type,
             content: att.content,
             ref: att.ref,
+            dataUrl: att.preview,
           })),
         }),
       });
@@ -294,7 +382,24 @@ export function ReaderAiChat({
   const canSend = (input.trim().length > 0 || attachments.length > 0) && !streaming && !proposing && !applying && !attaching;
 
   return (
-    <aside className="ai-assistant" aria-label="AI 助手与整理">
+    <aside
+      className={`ai-assistant ${dragging ? "ai-assistant-drop-active" : ""}`}
+      aria-label="AI 助手与整理"
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        const droppedFiles = Array.from(e.dataTransfer.files || []);
+        if (droppedFiles.length > 0) {
+          void handleFiles(droppedFiles);
+        }
+      }}
+      onPaste={handlePaste}
+    >
       <div className="reader-panel-header">
         <h2>
           <BotMessageSquare aria-hidden="true" />
@@ -315,13 +420,33 @@ export function ReaderAiChat({
         {messages.length === 0 && !pendingEdit && (
           <div className="ai-empty">
             <BotMessageSquare aria-hidden="true" />
-            <p>可上传图片或文档附件，让 AI 参考附件回答问题，或直接改写、扩写与整理文章。</p>
+            <p>可直接粘贴图片截图（Cmd+V）或拖入附件，让 AI 结合图片与文档回答，或直接改写、扩写与整理文章。</p>
           </div>
         )}
         {messages.map((message, index) =>
           message.role === "user" ? (
             <div key={`u-${index}`} className="ai-message ai-message--user">
-              {message.content}
+              {message.attachments && message.attachments.length > 0 && (
+                <div className="ai-chat-turn-attachments">
+                  {message.attachments.map((att) =>
+                    att.type === "image" && att.preview ? (
+                      <img
+                        key={att.id}
+                        src={att.preview}
+                        alt={att.name}
+                        title={att.name}
+                        className="ai-chat-turn-img"
+                      />
+                    ) : (
+                      <span key={att.id} className="ai-chat-turn-doc">
+                        <FileText size={12} aria-hidden="true" />
+                        <span>{att.name}</span>
+                      </span>
+                    ),
+                  )}
+                </div>
+              )}
+              <div className="ai-message-text">{message.content}</div>
             </div>
           ) : (
             <div
@@ -430,11 +555,12 @@ export function ReaderAiChat({
             placeholder={
               mode === "ask"
                 ? quoted?.text
-                  ? "针对引用的原文提问，可附加图片/文档…"
-                  : "问这篇文章相关的问题，可附加图片/文档…"
-                : "说明要怎么修改，可结合上传的图片或文档附件…"
+                  ? "针对引用的原文提问，支持直接粘贴图片/截图 (Cmd+V)…"
+                  : "问这篇文章相关问题，支持直接粘贴图片/截图 (Cmd+V)…"
+                : "说明如何修改，支持直接粘贴图片/截图 (Cmd+V)…"
             }
             onChange={(event) => setInput(event.target.value)}
+            onPaste={handlePaste}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
