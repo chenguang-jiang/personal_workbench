@@ -48,6 +48,24 @@ import {
   optionsSignature,
 } from "@/lib/quiz-embed";
 import { DeleteDocumentDialog } from "./DeleteDocumentDialog";
+import {
+  ArticleOutline,
+  ReaderTuner,
+  useReaderPrefs,
+  type ReaderFont,
+  type ReaderSize,
+} from "./ArticleChrome";
+import {
+  articleOrigin,
+  articleStamp,
+  extractArticleOutline,
+  headingIdFor,
+  normalizeTitle,
+  opensWithDocumentTitle,
+  readingMinutes,
+  restoreOmittedTitle,
+  type HeadingState,
+} from "@/lib/article-outline";
 
 interface SiblingFile {
   path: string;
@@ -80,6 +98,7 @@ export interface ReaderArticle {
   source?: string | null;
   url?: string | null;
   path?: string | null;
+  updatedAt?: string;
   readingProgress: number;
   highlights: Highlight[];
   notes: Note[];
@@ -124,6 +143,8 @@ export function Reader({
   const [editNotice, setEditNotice] = useState<string | null>(null);
   const [editNoticeError, setEditNoticeError] = useState(false);
   const router = useRouter();
+  const { font, size, setFont, setSize } = useReaderPrefs();
+  const [activeHeading, setActiveHeading] = useState("");
 
   // 题集文章（每日题库）：识别对应日期，读写完成状态，顶栏提供标记完成
   const quizDay = useMemo(() => {
@@ -556,7 +577,11 @@ export function Reader({
     setSaving(true);
     setSaveError(null);
     try {
-      const markdown = serializeProse(prose);
+      const markdown = restoreOmittedTitle(
+        serializeProse(prose),
+        article.title,
+        article.content ?? "",
+      );
       const response = await fetch(`/api/articles/${articleId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -742,6 +767,59 @@ export function Reader({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [article, editing, initialCitation]);
+
+  const outline = useMemo(
+    () => extractArticleOutline(article?.content ?? ""),
+    [article?.content],
+  );
+  const minutes = useMemo(
+    () => readingMinutes(article?.content ?? ""),
+    [article?.content],
+  );
+
+  useEffect(() => {
+    const root = contentRef.current;
+    if (!root || editing || outline.length === 0) return;
+    const nodes = outline
+      .map((item) => document.getElementById(item.id))
+      .filter((node): node is HTMLElement => Boolean(node));
+    if (nodes.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const id = visible[0]?.target.id;
+        if (id) setActiveHeading(id);
+      },
+      { root, rootMargin: "-12% 0px -62% 0px", threshold: [0, 1] },
+    );
+    for (const node of nodes) observer.observe(node);
+    return () => observer.disconnect();
+  }, [outline, editing, article?.content]);
+
+  const openedHash = useRef(false);
+  useEffect(() => {
+    if (openedHash.current || editing) return;
+    const id = window.location.hash.replace(/^#/, "");
+    const root = contentRef.current;
+    if (!id || !root || !outline.some((item) => item.id === id)) return;
+    openedHash.current = true;
+    scrollHeadingIntoView(id, root);
+  }, [outline, editing]);
+
+  const currentHeading = outline.some((item) => item.id === activeHeading)
+    ? activeHeading
+    : (outline[0]?.id ?? "");
+
+  function jumpToHeading(id: string) {
+    const root = contentRef.current;
+    if (!root) return;
+    scrollHeadingIntoView(id, root);
+    setActiveHeading(id);
+    const next = `${window.location.pathname}${window.location.search}#${id}`;
+    window.history.replaceState(null, "", next);
+  }
 
   if (loading) {
     return (
@@ -1132,34 +1210,89 @@ export function Reader({
                 )}
               </div>
             )}
-            <article className="reader-article">
-              <ViewTransition
-                name={`document-${article.id}`}
-                share="document-morph"
-                default="none"
-              >
-                <header className="reader-article-intro">
-                  <p className="micro-label">DEEP READING · SAVED LOCALLY</p>
-                  <h1>{article.title}</h1>
-                  <div className="reader-tags">
-                    {article.tags.map((tag) => (
-                      <span key={tag}>#{tag}</span>
-                    ))}
-                  </div>
-                </header>
-              </ViewTransition>
-              <MarkdownArticle
-                key={editing ? "editing" : "preview"}
-                content={article.content}
-                editing={editing}
-                articleId={articleId}
-                quizDay={quizDay}
-                quizWrong={quizWrong}
-                onToggleWrong={(qIndex, on) => void toggleEmbedWrong(qIndex, on)}
-                onMarkClick={(text) => openDesk("note", text)}
-                onTableNotice={handleTableNotice}
-              />
-            </article>
+            <div className="reader-stage">
+              {outline.length >= 2 && (
+                <aside className="reader-toc" aria-label="篇内导航">
+                  <p className="reader-toc-kicker">
+                    本篇目录
+                    <span>{outline.length} 个小节</span>
+                  </p>
+                  <ArticleOutline
+                    items={outline}
+                    activeId={currentHeading}
+                    onJump={jumpToHeading}
+                  />
+                </aside>
+              )}
+              <article className="reader-article">
+                <ViewTransition
+                  name={`document-${article.id}`}
+                  share="document-morph"
+                  default="none"
+                >
+                  <header className="reader-article-intro">
+                    <h1>{article.title}</h1>
+                    <p className="reader-byline">
+                      <span>{articleOrigin(article)}</span>
+                      {articleStamp(article.updatedAt) ? (
+                        <span>
+                          <span aria-hidden="true">·</span>
+                          <time dateTime={article.updatedAt}>
+                            {articleStamp(article.updatedAt)}
+                          </time>
+                        </span>
+                      ) : null}
+                      <span>
+                        <span aria-hidden="true">·</span>
+                        约 {minutes} 分钟阅读
+                      </span>
+                    </p>
+                    <ReaderTuner
+                      font={font}
+                      size={size}
+                      onFont={setFont}
+                      onSize={setSize}
+                    />
+                    {article.tags.length > 0 && (
+                      <div className="reader-tags">
+                        {article.tags.map((tag) => (
+                          <span key={tag}>#{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                    {outline.length >= 2 && (
+                      <details className="reader-toc-mobile">
+                        <summary>
+                          本篇目录
+                          <span>{outline.length} 个小节</span>
+                        </summary>
+                        <ArticleOutline
+                          items={outline}
+                          activeId={currentHeading}
+                          onJump={jumpToHeading}
+                        />
+                      </details>
+                    )}
+                  </header>
+                </ViewTransition>
+                <MarkdownArticle
+                  key={editing ? "editing" : "preview"}
+                  content={article.content}
+                  editing={editing}
+                  articleId={articleId}
+                  documentTitle={article.title}
+                  font={font}
+                  size={size}
+                  quizDay={quizDay}
+                  quizWrong={quizWrong}
+                  onToggleWrong={(qIndex, on) =>
+                    void toggleEmbedWrong(qIndex, on)
+                  }
+                  onMarkClick={(text) => openDesk("note", text)}
+                  onTableNotice={handleTableNotice}
+                />
+              </article>
+            </div>
           </div>
         </div>
 
@@ -1400,6 +1533,18 @@ function locateCitationQuote(prose: HTMLElement, markdownQuote: string) {
   return null;
 }
 
+function scrollHeadingIntoView(id: string, root: HTMLElement) {
+  const target = document.getElementById(id);
+  if (!target) return;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const top =
+    target.getBoundingClientRect().top -
+    root.getBoundingClientRect().top +
+    root.scrollTop -
+    16;
+  root.scrollTo({ top: Math.max(0, top), behavior: reduce ? "auto" : "smooth" });
+}
+
 function getTextOffset(container: Node, range: Range) {
   const leading = document.createRange();
   leading.selectNodeContents(container);
@@ -1411,6 +1556,9 @@ function MarkdownArticle({
   content,
   editing = false,
   articleId = null,
+  documentTitle,
+  font = "sans",
+  size = "md",
   onMarkClick,
   onTableNotice,
   quizDay,
@@ -1420,6 +1568,9 @@ function MarkdownArticle({
   content: string;
   editing?: boolean;
   articleId?: string | null;
+  documentTitle?: string;
+  font?: ReaderFont;
+  size?: ReaderSize;
   quizDay?: string | null;
   quizWrong?: number[];
   onToggleWrong?: (qIndex: number, on: boolean) => void;
@@ -1527,12 +1678,22 @@ function MarkdownArticle({
   }, [content, editing]);
 
   const blocks = splitMermaidBlocks(content);
+  const headingState: HeadingState = { section: 0, subsection: 0 };
+  const renderOptions: RenderOptions = {
+    headings: headingState,
+    documentTitle,
+    omitOpeningTitle: Boolean(
+      documentTitle && opensWithDocumentTitle(content, documentTitle),
+    ),
+  };
   return (
     <div
       ref={proseRef}
       className={
         editing ? "reader-prose reader-prose--editing" : "reader-prose"
       }
+      data-font={font}
+      data-size={size}
       contentEditable={editing || undefined}
       suppressContentEditableWarning
       spellCheck={false}
@@ -1562,7 +1723,7 @@ function MarkdownArticle({
           <div
             className="reader-markdown-fragment"
             dangerouslySetInnerHTML={{
-              __html: renderMarkdown(block.content, linkMap),
+              __html: renderMarkdown(block.content, linkMap, renderOptions),
             }}
             key={`markdown-${index}`}
           />
@@ -1704,7 +1865,18 @@ function splitMermaidBlocks(markdown: string) {
 /** 覆盖阅读场景常用块级语法，并在插入 DOM 前统一转义原始内容。 */
 type LinkMap = Record<string, string>;
 
-function renderMarkdown(md: string, linkMap: LinkMap = {}): string {
+type RenderOptions = {
+  headings: HeadingState;
+  documentTitle?: string;
+  omitOpeningTitle?: boolean;
+  titleOmitted?: boolean;
+};
+
+function renderMarkdown(
+  md: string,
+  linkMap: LinkMap = {},
+  options?: RenderOptions,
+): string {
   if (!md) return "";
 
   const lines = md.replace(/\r\n/g, "\n").split("\n");
@@ -1748,6 +1920,16 @@ function renderMarkdown(md: string, linkMap: LinkMap = {}): string {
     if (heading) {
       flushParagraph();
       const level = heading[1].length;
+      if (
+        options?.omitOpeningTitle &&
+        !options.titleOmitted &&
+        level === 1 &&
+        options.documentTitle &&
+        normalizeTitle(heading[2]) === normalizeTitle(options.documentTitle)
+      ) {
+        options.titleOmitted = true;
+        continue;
+      }
       const isRelated = /相关(笔记|文档|链接|资料)|关联(文档|笔记|链接)/.test(
         heading[2],
       );
@@ -1761,8 +1943,17 @@ function renderMarkdown(md: string, linkMap: LinkMap = {}): string {
           if (output[i].trim()) break;
         }
       }
+      const id = options?.headings
+        ? headingIdFor(level, options.headings)
+        : undefined;
+      const numbered =
+        level === 3 ? heading[2].match(/^(\d+)[.、]\s+(.+)$/) : null;
+      const inner = numbered
+        ? `<span class="reader-h-index">${escapeHtml(numbered[1])}.</span> ${renderInline(numbered[2], linkMap)}`
+        : renderInline(heading[2], linkMap);
+      const className = isRelated ? ' class="reader-related-heading"' : "";
       output.push(
-        `<h${level}${isRelated ? ' class="reader-related-heading"' : ""}>${renderInline(heading[2], linkMap)}</h${level}>`,
+        `<h${level}${id ? ` id="${id}" tabindex="-1"` : ""}${className}>${inner}</h${level}>`,
       );
       continue;
     }
@@ -1881,7 +2072,7 @@ function renderMarkdown(md: string, linkMap: LinkMap = {}): string {
         chunk.push(lines[index]);
         closed = /<\/details>/i.test(lines[index]);
       }
-      output.push(renderDetailsBlock(chunk.join("\n"), linkMap));
+      output.push(renderDetailsBlock(chunk.join("\n"), linkMap, options));
       continue;
     }
 
@@ -1893,7 +2084,11 @@ function renderMarkdown(md: string, linkMap: LinkMap = {}): string {
 }
 
 /** <details>/<summary> 折叠块：默认收起，点击 summary 展开 */
-function renderDetailsBlock(source: string, linkMap: LinkMap = {}): string {
+function renderDetailsBlock(
+  source: string,
+  linkMap: LinkMap = {},
+  options?: RenderOptions,
+): string {
   const inner = source
     .replace(/<details[^>]*>/gi, "")
     .replace(/<\/details>/gi, "");
@@ -1902,7 +2097,7 @@ function renderDetailsBlock(source: string, linkMap: LinkMap = {}): string {
     ? summaryMatch[1].replace(/<[^>]+>/g, "").trim()
     : "展开详情";
   const bodySource = summaryMatch ? inner.replace(summaryMatch[0], "") : inner;
-  const body = renderMarkdown(bodySource, linkMap);
+  const body = renderMarkdown(bodySource, linkMap, options);
   return `<details class="reader-details"><summary>${escapeHtml(summary)}</summary><div class="reader-details-body">${body}</div></details>`;
 }
 

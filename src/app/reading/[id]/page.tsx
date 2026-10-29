@@ -76,6 +76,7 @@ export default async function ReadingPage({
         tags: article.tags,
         source: article.source,
         url: article.url,
+        updatedAt: article.updatedAt.toISOString(),
         readingProgress: article.readingProgress,
         highlights: article.highlights.map((highlight) => ({
           id: highlight.id,
