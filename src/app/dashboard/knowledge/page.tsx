@@ -278,8 +278,12 @@ export default function KnowledgeGraphPage() {
                 {selectedNode.tags.slice(0, 4).map((tag) => <span key={tag}>#{tag}</span>)}
               </div>
               {selectedNode.articleId && (
-                <Link href={`/reading/${selectedNode.articleId}`} className="button button-secondary">
-                  <FileText aria-hidden="true" /> 打开文档
+                <Link href={`/reading/${selectedNode.articleId}`} className="graph-open-doc-btn">
+                  <span className="graph-open-doc-label">
+                    <FileText aria-hidden="true" size={14} />
+                    <span>打开完整文档</span>
+                  </span>
+                  <ArrowUpRight aria-hidden="true" size={14} className="graph-open-doc-arrow" />
                 </Link>
               )}
               <p className="graph-related-title">相关页面 · {relatedNodes.length}</p>

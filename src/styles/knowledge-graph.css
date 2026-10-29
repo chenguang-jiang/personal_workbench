@@ -181,6 +181,63 @@
   font-size: 11.5px;
 }
 
+.graph-open-doc-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 14px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.graph-open-doc-btn:hover {
+  border-color: var(--color-accent-purple);
+  background: var(--color-accent-lilac);
+  color: var(--color-accent-purple-dark);
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--color-accent-purple) 15%, transparent);
+  transform: translateY(-1px);
+}
+
+.graph-open-doc-btn:active {
+  transform: translateY(0);
+}
+
+.graph-open-doc-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.graph-open-doc-label svg {
+  color: var(--color-accent-purple);
+  flex-shrink: 0;
+}
+
+.graph-open-doc-arrow {
+  color: var(--color-tertiary);
+  flex-shrink: 0;
+  transition: transform 150ms ease, color 150ms ease;
+}
+
+.graph-open-doc-btn:hover .graph-open-doc-arrow {
+  color: var(--color-accent-purple-dark);
+  transform: translate(1px, -1px);
+}
+
 .graph-related-title {
   margin: 26px 0 8px;
   border-bottom: 1px solid var(--color-border);
