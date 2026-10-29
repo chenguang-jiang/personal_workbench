@@ -1984,6 +1984,30 @@ const MarkdownArticle = memo(function MarkdownArticle({
       contentEditable={editing || undefined}
       suppressContentEditableWarning
       spellCheck={false}
+      onKeyDown={(event) => {
+        if (!editing) return;
+        if (event.key === "Backspace") {
+          const sel = window.getSelection();
+          if (sel && sel.isCollapsed && sel.rangeCount > 0) {
+            const anchor = sel.anchorNode;
+            const el =
+              anchor instanceof Element ? anchor : (anchor?.parentElement ?? null);
+            const heading = el?.closest("h1, h2, h3, h4, h5, h6, blockquote");
+            if (heading && (heading.textContent ?? "").trim() === "") {
+              event.preventDefault();
+              const p = document.createElement("p");
+              p.innerHTML = "<br>";
+              heading.replaceWith(p);
+              const range = document.createRange();
+              range.setStart(p, 0);
+              range.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(range);
+              proseRef.current?.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+          }
+        }
+      }}
       onClick={(event) => {
         if (editing) {
           // 编辑态下阻止链接跳转与复制按钮，点击仅用于放置光标；

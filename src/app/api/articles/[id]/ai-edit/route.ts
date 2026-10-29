@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { chatOnce, getAiStatus } from "@/lib/ai";
 import { loadAttachedImage } from "@/lib/cloud/import-assets";
+import { applySearchReplaceBlocks } from "@/lib/patch-edit";
 import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
-// 与一键整理同一上限：超长文档一次交不全模型，返回稿会截断丢内容
-const AI_EDIT_MAX_CHARS = 12000;
-// 返回稿显著短于原文多半是截断，直接拒绝（用户可能在预览里再要求删减，所以阈值放宽到 40%）
-const MIN_RESULT_RATIO = 0.4;
+// 取消原 12,000 字上限，支持长文精准 SEARCH/REPLACE 局部补丁与全量编辑，支持最高 300,000 字
+const AI_EDIT_MAX_CHARS = 300_000;
 const countFences = (text: string) => (text.match(/```/g) ?? []).length;
 
 // POST /api/articles/[id]/ai-edit — 按指令 AI 修改文章内容（只返回修改稿，应用由客户端走 PATCH）
@@ -40,7 +39,7 @@ export async function POST(
   const original = article.content;
   if (original.length > AI_EDIT_MAX_CHARS) {
     return NextResponse.json(
-      { error: `文档超过 ${AI_EDIT_MAX_CHARS.toLocaleString()} 字，暂不支持 AI 修改（避免截断丢失内容）` },
+      { error: `文档超过 ${AI_EDIT_MAX_CHARS.toLocaleString()} 字，请划选特定段落后再行修改` },
       { status: 413 },
     );
   }
@@ -72,18 +71,42 @@ export async function POST(
     }
   }
 
+  const isLongArticle = original.length > 8000;
+  const isTargetedInstruction =
+    /(?:删除|去掉|去除|删掉|移除|清空|抹掉|删去|替换|改成|改为|插入|加一段|修改第|修改标题|h[1-6]|标题)/.test(instruction);
+
   try {
     const proposed = await chatOnce({
       system: [
-        "你是文章修改助手。根据用户的指令修改给出的 Markdown 文章，返回修改后的完整文章。",
-        "要求：只做指令要求的修改，其余内容一字不改；保持原文的语言、语气和 Markdown 结构；",
-        "代码块、mermaid 图、表格、链接、图片、wikilink 除指令明确要求外一律原样保留；",
-        "直接输出修改后的完整 Markdown，不要解释，不要把全文包进 ``` 代码围栏。",
+        "你是专业的知识库文章编辑 Agent。根据用户的指令修改给出的 Markdown 文章。",
+        "【修改原则与格式处理】",
+        "1. 严格遵照用户指令修改。如果用户要求删除、修改、降级或替换原有的字体样式、Markdown 格式或标题级别（例如：删除 h2/h3 标题、将标题转为普通正文、去掉加粗/斜体/引用块等），必须坚决执行用户指令，不要因“保持结构”而强行保留用户要求删除的样式或标题！",
+        "2. 未提及修改的段落保持原文的语言、语气和内容；代码块、mermaid 图、表格、链接除指令明确要求修改外原样保留；",
+        "【输出格式规范】",
+        isLongArticle || isTargetedInstruction
+          ? [
+              "由于文章可能篇幅较长或修改为局部调整，为防止大模型全量输出截断丢失内容，你应当优先使用精准的 SEARCH/REPLACE 块返回局部修改（可提供多个修改块）：",
+              "<<<<<<< SEARCH",
+              "[原文中需要被替换或删除的精确文本片段，必须与原文完全一致]",
+              "=======",
+              "[替换后的新文本内容；若用户的意图是删除该段或删除该标题样式，此处留空]",
+              ">>>>>>> REPLACE",
+              "不要在 SEARCH/REPLACE 块之外输出长篇解释。",
+            ].join("\n")
+          : [
+              "你可以直接输出修改后的完整 Markdown 全文（不要输出任何解释性文字，不要把全文包进代码围栏）；",
+              "也可以使用精准的 SEARCH/REPLACE 块返回局部修改：",
+              "<<<<<<< SEARCH",
+              "[待替换原文]",
+              "=======",
+              "[替换后文本，删除留空]",
+              ">>>>>>> REPLACE",
+            ].join("\n"),
         selection ? "用户同时引用了一段原文，指令里的“这段/它”等指代以引用的原文为准。" : "",
         attachmentBlocks.length > 0 ? "用户附带了参考文档或图片附件，请结合附件内容修改，或按指示在合适位置嵌入 ![[图片名]]。" : "",
       ]
         .filter(Boolean)
-        .join("\n"),
+        .join("\n\n"),
       messages: [
         {
           role: "user",
@@ -101,19 +124,34 @@ export async function POST(
       ],
       maxTokens: 8000,
     });
-    const clean = proposed
-      .trim()
-      // 模型偶尔无视指令把全文包进围栏，剥掉成对的首尾围栏行
-      .replace(/^```[a-zA-Z0-9_-]*\n/, "")
-      .replace(/\n```$/, "");
-    if (!clean) throw new Error("AI 未返回内容");
-    if (clean.length < original.length * MIN_RESULT_RATIO) {
+
+    const patched = applySearchReplaceBlocks(original, proposed);
+    let clean = "";
+    if (patched.count > 0) {
+      clean = patched.content.trim();
+    } else {
+      clean = proposed
+        .trim()
+        // 模型偶尔无视指令把全文包进围栏，剥掉成对的首尾围栏行
+        .replace(/^```[a-zA-Z0-9_-]*\n/, "")
+        .replace(/\n```$/, "");
+    }
+
+    if (!clean) throw new Error("AI 未返回有效修改内容");
+
+    const isDeleteInstruction = /(?:删除|去掉|去除|删掉|移除|清空|抹掉|删去)/.test(instruction);
+    const minRatio = isDeleteInstruction ? 0.05 : 0.35;
+    if (clean.length < original.length * minRatio) {
       return NextResponse.json({ error: "修改结果不完整（过短），已放弃，请重试" }, { status: 502 });
     }
-    // 围栏数量必须成对且不少于原文：防止截断把代码块切一半
-    if (countFences(clean) < countFences(original) || countFences(clean) % 2 !== 0) {
-      return NextResponse.json({ error: "修改结果丢失或破坏了代码块，已放弃，请重试" }, { status: 502 });
+
+    // 围栏数量必须成对且不少于原文（除非指令明确要求删代码块）
+    if (!/(?:代码|围栏|block).*(?:删|去)/.test(instruction)) {
+      if (countFences(clean) < countFences(original) || countFences(clean) % 2 !== 0) {
+        return NextResponse.json({ error: "修改结果破坏了代码块结构，已放弃，请重试" }, { status: 502 });
+      }
     }
+
     return NextResponse.json({ content: clean });
   } catch (error) {
     return NextResponse.json(

@@ -36,6 +36,34 @@
   opacity: 0.55;
 }
 
+/* ── 编辑态标题重置：隐藏 § 序号与伪元素装饰，还原为标准块级文本，便于光标退格、删除与格式降级 ── */
+.reader-prose--editing h2:not(.reader-related-heading)::before {
+  display: none !important;
+  content: none !important;
+}
+
+.reader-prose--editing h2:not(.reader-related-heading) {
+  display: block !important;
+  counter-increment: none !important;
+  gap: 0 !important;
+  border-bottom: 1px dashed color-mix(in oklab, var(--color-border) 80%, transparent) !important;
+  padding-bottom: 6px !important;
+}
+
+.reader-prose--editing h3 {
+  border-left: 3px solid color-mix(in oklab, var(--color-accent-amber) 50%, transparent) !important;
+  padding-left: 8px !important;
+}
+
+.reader-prose--editing h4 {
+  padding-left: 0 !important;
+}
+
+.reader-prose--editing h4::before {
+  display: none !important;
+  content: none !important;
+}
+
 .reader-edit-hint {
   display: flex;
   gap: 10px;

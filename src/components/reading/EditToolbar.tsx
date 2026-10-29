@@ -12,9 +12,11 @@ import {
   List,
   ListOrdered,
   Minus,
+  RemoveFormatting,
   Strikethrough,
   Table,
   TextQuote,
+  Type,
   Workflow,
 } from "lucide-react";
 import { insertBlockAtSelection, markDirty } from "@/lib/table-edit";
@@ -60,12 +62,90 @@ export function EditToolbar({
     markDirty(found.prose);
   }
 
-  // 块级格式切换：已在目标块里则退回段落
+  // 块级格式切换：已在目标块里则退回普通段落；否则替换当前块元素
   function toggleBlock(tag: "h2" | "h3" | "blockquote") {
     const found = selectionInProse();
     if (!found) return;
     const inside = found.node?.closest(tag);
-    exec("formatBlock", inside ? "<p>" : `<${tag}>`);
+    if (inside && inside !== found.prose) {
+      // 已经在这个块里：退回普通段落 <p>
+      const p = document.createElement("p");
+      p.innerHTML = inside.innerHTML || "<br>";
+      inside.replaceWith(p);
+      const range = document.createRange();
+      range.selectNodeContents(p);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      found.prose.focus();
+      markDirty(found.prose);
+      return;
+    }
+    // 检查是否在其他块中（例如从 h3 转 h2，或从 p 转 h2）
+    const otherBlock = found.node?.closest("h1, h2, h3, h4, h5, h6, blockquote, p");
+    if (otherBlock && otherBlock !== found.prose) {
+      const newEl = document.createElement(tag);
+      newEl.innerHTML = otherBlock.innerHTML || "<br>";
+      otherBlock.replaceWith(newEl);
+      const range = document.createRange();
+      range.selectNodeContents(newEl);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      found.prose.focus();
+      markDirty(found.prose);
+      return;
+    }
+    exec("formatBlock", `<${tag}>`);
+  }
+
+  // 转为普通正文段落（去除 h1-h6 标题或引用格式）
+  function convertToParagraph() {
+    const found = selectionInProse();
+    if (!found) return;
+    const block = found.node?.closest("h1, h2, h3, h4, h5, h6, blockquote");
+    if (block && block !== found.prose) {
+      const p = document.createElement("p");
+      p.innerHTML = block.innerHTML || "<br>";
+      block.replaceWith(p);
+      const range = document.createRange();
+      range.selectNodeContents(p);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      found.prose.focus();
+      markDirty(found.prose);
+      return;
+    }
+    exec("formatBlock", "<p>");
+  }
+
+  // 清除格式（包括行内样式与标题样式）
+  function clearFormat() {
+    const found = selectionInProse();
+    if (!found) return;
+    found.prose.focus();
+    try {
+      document.execCommand("removeFormat", false);
+    } catch {
+      // ignore
+    }
+    const block = found.node?.closest("h1, h2, h3, h4, h5, h6, blockquote");
+    if (block && block !== found.prose) {
+      const p = document.createElement("p");
+      p.innerHTML = block.innerHTML || "<br>";
+      block.replaceWith(p);
+      const range = document.createRange();
+      range.selectNodeContents(p);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+    markDirty(found.prose);
   }
 
   // 行内包裹（删除线/行内码等 execCommand 产出不可控的格式）：
@@ -165,12 +245,14 @@ export function EditToolbar({
         return;
       }
       const el = found.node;
+      const isHeading = Boolean(el?.closest("h1, h2, h3, h4, h5, h6"));
       setActive({
         bold: safeQueryState("bold"),
         italic: safeQueryState("italic"),
         strike: safeQueryState("strikeThrough"),
         ul: safeQueryState("insertUnorderedList"),
         ol: safeQueryState("insertOrderedList"),
+        paragraph: Boolean(el?.closest("p")) && !isHeading,
         h2: Boolean(el?.closest("h2")),
         h3: Boolean(el?.closest("h3")),
         quote: Boolean(el?.closest("blockquote")),
@@ -186,10 +268,20 @@ export function EditToolbar({
       <div className="reader-edit-toolbar__group">
         <button
           type="button"
+          data-active={active.paragraph || undefined}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={convertToParagraph}
+          title="正文 / 转为普通段落"
+          aria-label="正文段落"
+        >
+          <Type aria-hidden="true" />
+        </button>
+        <button
+          type="button"
           data-active={active.h2 || undefined}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => toggleBlock("h2")}
-          title="标题（大）"
+          title="标题（大）· 点击退回正文"
           aria-label="二级标题"
         >
           <Heading2 aria-hidden="true" />
@@ -199,10 +291,19 @@ export function EditToolbar({
           data-active={active.h3 || undefined}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => toggleBlock("h3")}
-          title="标题（小）"
+          title="标题（小）· 点击退回正文"
           aria-label="三级标题"
         >
           <Heading3 aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={clearFormat}
+          title="清除格式（去除粗体/斜体与标题样式）"
+          aria-label="清除格式"
+        >
+          <RemoveFormatting aria-hidden="true" />
         </button>
       </div>
       <div className="reader-edit-toolbar__group">

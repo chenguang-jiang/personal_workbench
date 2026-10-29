@@ -7,8 +7,8 @@ const countHeadings = (text: string) => (text.match(/^#{1,6} /gm) ?? []).length;
 // 整理只应改动空白与列表符号：去掉空白和列表标记后的“实质字符数”变化超过此比例即视为改写/截断
 const visibleLength = (text: string) => text.replace(/[\s\-*+>]/g, "").length;
 const MAX_CONTENT_DRIFT = 0.03;
-// 超过此长度的文档无法一次完整交给模型，直接拒绝，避免整理稿把尾部截掉后写回 vault
-const TIDY_MAX_CHARS = 12000;
+// 提高一键整理长度上限至 100,000 字
+const TIDY_MAX_CHARS = 100_000;
 
 // POST /api/articles/[id]/tidy — AI 一键整理 Markdown 格式（只返回整理稿，应用由客户端走 PATCH）
 export async function POST(
