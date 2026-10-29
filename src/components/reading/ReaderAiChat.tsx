@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp,
   BotMessageSquare,
@@ -9,6 +9,7 @@ import {
   Loader2,
   Paperclip,
   PenLine,
+  Sparkles,
   X,
 } from "lucide-react";
 import { renderMiniMarkdown } from "@/lib/mini-markdown";
@@ -30,6 +31,77 @@ type ChatMessage = {
   content: string;
   attachments?: ChatAttachment[];
 };
+
+export function isEditIntent(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  // 1. 明确的纯提问句型不作为自动修改
+  const isQuestionPattern =
+    /^(?:为什么|为何|什么是|啥是|怎么|怎样|如何|有没有|是否存在|哪里|哪儿|谁是|有哪些)/.test(trimmed) &&
+    !/(?:帮我|请帮|替我|立即|把|将)/.test(trimmed) &&
+    /[?？]$/.test(trimmed);
+  if (isQuestionPattern) return false;
+
+  // 2. 包含删除、去掉、移除等意图
+  if (
+    /(?:删除|去掉|去除|删掉|移除|清空|抹掉|删去)/.test(trimmed) ||
+    /相关内容删除/.test(trimmed)
+  ) {
+    return true;
+  }
+
+  // 3. 包含改写、润色、更正、替换、重新排版等指令
+  if (
+    /(?:修改|改写|重写|润色|替换|更正|修正|调换|优化排版|重新排版|整理正文|增补|在文[首末]|加一段|补一段)/.test(trimmed)
+  ) {
+    return true;
+  }
+
+  // 4. “把 A 改成 B”、“将 A 替换为 B”、“把 A 删了” 等句式
+  if (/(?:把|将).*(?:改成|改为|换成|替换为|替换成|删除|去掉|删掉|移除)/.test(trimmed)) {
+    return true;
+  }
+
+  // 5. 带有以“删除/修改/润色/更新/替换”结尾或开头的短语（如“(创建者：xxx) 相关内容删除”）
+  if (/[，,。\s]*(?:删除|修改|去掉|替换|润色)[!！。]?$/.test(trimmed)) {
+    return true;
+  }
+
+  return false;
+}
+
+interface DiffSnippet {
+  hasChanges: boolean;
+  startLine: number;
+  removed: string[];
+  added: string[];
+  contextBefore: string[];
+  contextAfter: string[];
+}
+
+function computeDiff(original: string, modified: string): DiffSnippet {
+  const origLines = (original || "").split("\n");
+  const modLines = (modified || "").split("\n");
+  let start = 0;
+  while (start < origLines.length && start < modLines.length && origLines[start] === modLines[start]) {
+    start++;
+  }
+  let endOrig = origLines.length - 1;
+  let endMod = modLines.length - 1;
+  while (endOrig >= start && endMod >= start && origLines[endOrig] === modLines[endMod]) {
+    endOrig--;
+    endMod--;
+  }
+  return {
+    hasChanges: start <= endOrig || start <= endMod,
+    startLine: start + 1,
+    removed: origLines.slice(start, endOrig + 1),
+    added: modLines.slice(start, endMod + 1),
+    contextBefore: origLines.slice(Math.max(0, start - 2), start),
+    contextAfter: origLines.slice(endOrig + 1, endOrig + 3),
+  };
+}
 
 function extractClipboardFiles(clipboardData: DataTransfer | null): File[] {
   if (!clipboardData) return [];
@@ -87,6 +159,7 @@ export function ReaderAiChat({
   const [streaming, setStreaming] = useState(false);
   const [proposing, setProposing] = useState(false);
   const [pendingEdit, setPendingEdit] = useState<string | null>(null);
+  const [showDiff, setShowDiff] = useState(true);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -96,6 +169,11 @@ export function ReaderAiChat({
   const [quoted] = useState(selection);
   const listRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const diff = useMemo(() => {
+    if (!pendingEdit) return null;
+    return computeDiff(articleContent, pendingEdit);
+  }, [articleContent, pendingEdit]);
 
   useEffect(() => {
     const list = listRef.current;
@@ -231,7 +309,7 @@ export function ReaderAiChat({
       }
     }
 
-    if (mode === "edit") {
+    if (mode === "edit" || isEditIntent(question)) {
       await proposeEdit(question, currentAttachments);
       return;
     }
@@ -354,6 +432,14 @@ export function ReaderAiChat({
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error || "AI 修改失败");
       setPendingEdit(data.content as string);
+      setShowDiff(true);
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: `🤖 **Agent 已为您起草修改方案**。\n\n已根据指令「${summary}」调整正文内容。请在下方核对修改差异（Diff），确认无误后点击 **「应用到文章」** 即可直接写入正文。`,
+        },
+      ]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "AI 修改失败");
     } finally {
@@ -369,7 +455,7 @@ export function ReaderAiChat({
       await onApplyEdit(pendingEdit);
       setMessages((current) => [
         ...current,
-        { role: "assistant", content: "已把修改写入文章。可以在顶部工具栏用撤销按钮返回修改前。" },
+        { role: "assistant", content: "✅ **修改已成功写入文章**！可在阅读页直接查看最新正文，顶部工具栏亦支持一键撤销。" },
       ]);
       setPendingEdit(null);
     } catch (caught) {
@@ -456,20 +542,56 @@ export function ReaderAiChat({
               }`}
             >
               {message.content ? (
-                <AnswerBody content={message.content} />
+                <>
+                  <AnswerBody content={message.content} />
+                  {!streaming && !proposing && !pendingEdit && index > 0 && messages[index - 1]?.role === "user" && (
+                    <div className="ai-message-agent-bar">
+                      <button
+                        type="button"
+                        className="ai-agent-action-btn"
+                        onClick={() => void proposeEdit(messages[index - 1].content)}
+                        disabled={streaming || proposing || applying}
+                        title="让 Agent 执行本轮修改指令并应用到文章"
+                      >
+                        <Sparkles size={12} aria-hidden="true" />
+                        <span>让 Agent 自动修改并应用到文章</span>
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <span className="ai-placeholder">正在思考…</span>
               )}
             </div>
           ),
         )}
+        {proposing && (
+          <div className="ai-message ai-message--assistant ai-streaming">
+            <span className="ai-placeholder">
+              <Loader2 size={13} className="ai-spinner" aria-hidden="true" /> Agent 正在分析并修改文章…
+            </span>
+          </div>
+        )}
         {pendingEdit !== null && (
           <div className="ai-edit-card" data-pending>
             <div className="ai-edit-card-head">
               <span>
-                <PenLine aria-hidden="true" /> AI 修改稿
+                <Sparkles size={13} className="text-amber-500" aria-hidden="true" /> Agent 修改建议稿
+                {diff?.hasChanges && (
+                  <small className="ai-edit-change-badge">
+                    -{diff.removed.length} / +{diff.added.length} 行
+                  </small>
+                )}
               </span>
               <div className="ai-edit-card-actions">
+                <button
+                  type="button"
+                  className="ai-edit-view-toggle"
+                  onClick={() => setShowDiff((v) => !v)}
+                  title="切换差异对比与完整文本"
+                >
+                  {showDiff ? "查看全文" : "差异对比"}
+                </button>
                 <button type="button" className="ai-edit-discard" onClick={() => setPendingEdit(null)} disabled={applying}>
                   放弃
                 </button>
@@ -479,7 +601,36 @@ export function ReaderAiChat({
                 </button>
               </div>
             </div>
-            <pre>{pendingEdit}</pre>
+            {showDiff && diff && diff.hasChanges ? (
+              <div className="ai-edit-diff-box">
+                {diff.contextBefore.map((line, i) => (
+                  <div key={`cb-${i}`} className="ai-diff-line ai-diff-line--ctx">
+                    <span className="ai-diff-sign"> </span>
+                    <code>{line || " "}</code>
+                  </div>
+                ))}
+                {diff.removed.map((line, i) => (
+                  <div key={`rm-${i}`} className="ai-diff-line ai-diff-line--del">
+                    <span className="ai-diff-sign">-</span>
+                    <code>{line || " "}</code>
+                  </div>
+                ))}
+                {diff.added.map((line, i) => (
+                  <div key={`ad-${i}`} className="ai-diff-line ai-diff-line--add">
+                    <span className="ai-diff-sign">+</span>
+                    <code>{line || " "}</code>
+                  </div>
+                ))}
+                {diff.contextAfter.map((line, i) => (
+                  <div key={`ca-${i}`} className="ai-diff-line ai-diff-line--ctx">
+                    <span className="ai-diff-sign"> </span>
+                    <code>{line || " "}</code>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <pre>{pendingEdit}</pre>
+            )}
           </div>
         )}
         {error && (
@@ -497,7 +648,7 @@ export function ReaderAiChat({
             onClick={() => setMode("ask")}
             disabled={streaming || proposing}
           >
-            问答
+            <Sparkles size={12} aria-hidden="true" /> 智能 Agent
           </button>
           <button
             type="button"
@@ -505,7 +656,7 @@ export function ReaderAiChat({
             onClick={() => setMode("edit")}
             disabled={streaming || proposing}
           >
-            修改与整理文章
+            <PenLine size={12} aria-hidden="true" /> 全文定向修改
           </button>
         </div>
 
@@ -555,9 +706,9 @@ export function ReaderAiChat({
             placeholder={
               mode === "ask"
                 ? quoted?.text
-                  ? "针对引用的原文提问，支持直接粘贴图片/截图 (Cmd+V)…"
-                  : "问这篇文章相关问题，支持直接粘贴图片/截图 (Cmd+V)…"
-                : "说明如何修改，支持直接粘贴图片/截图 (Cmd+V)…"
+                  ? "针对引用的原文提问或下达修改指令，支持直接粘贴截图 (Cmd+V)…"
+                  : "问这篇文章或直接输入修改指令（如“删除创建者信息”），支持粘贴截图 (Cmd+V)…"
+                : "输入文章修改、润色或增删指令，支持直接粘贴截图/文档 (Cmd+V)…"
             }
             onChange={(event) => setInput(event.target.value)}
             onPaste={handlePaste}
