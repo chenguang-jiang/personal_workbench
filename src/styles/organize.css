@@ -1,0 +1,474 @@
+/* ── AI 整理 / 回收站 / 文件夹管理 ─────────────────── */
+
+/* 文件夹面板标题右侧的操作区（统计 tag + 新建按钮） */
+.folder-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 文件夹名输入框 */
+.folder-dialog-input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-elevated);
+  padding: 10px 12px;
+  color: var(--color-primary);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.folder-dialog-input:focus-visible {
+  outline: 2px solid var(--color-accent-purple);
+  outline-offset: 1px;
+}
+
+.folder-dialog-hint {
+  display: block;
+  margin-bottom: 14px;
+  color: var(--color-tertiary);
+  font-size: 11px;
+}
+
+/* 新建文章对话框的保存文件夹行：图标 + 下拉 */
+.create-article-folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--color-secondary);
+}
+
+.create-article-folder > svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--color-accent-purple);
+}
+
+.create-article-folder .select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── AI 整理对话框 ─────────────────── */
+
+.organize-overlay {
+  align-items: center;
+}
+
+.organize-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(680px, calc(100vw - 40px));
+  max-height: min(86vh, 820px);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  box-shadow: 0 30px 70px color-mix(in oklab, var(--color-primary) 32%, transparent);
+  animation: confirm-pop 200ms var(--ease-out-expo, ease-out);
+  overflow: hidden;
+}
+
+.organize-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 18px 20px;
+}
+
+.organize-head .confirm-dialog-icon {
+  flex: none;
+  border-color: color-mix(in oklab, var(--color-accent-purple) 30%, transparent);
+  background: color-mix(in oklab, var(--color-accent-purple) 10%, var(--color-surface));
+  color: var(--color-accent-purple);
+  margin-bottom: 0;
+}
+
+.organize-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.organize-head h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--color-primary);
+}
+
+.organize-head p {
+  margin: 0;
+  color: var(--color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.organize-close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-elevated);
+  color: var(--color-tertiary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 160ms var(--ease-click, ease);
+}
+
+.organize-close:hover:not(:disabled) {
+  color: var(--color-primary);
+}
+
+.organize-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.organize-banner svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+
+.organize-banner--error {
+  background: color-mix(in oklab, var(--color-accent-rose) 12%, var(--color-surface));
+  color: var(--color-accent-rose);
+}
+
+.organize-banner--warn {
+  background: color-mix(in oklab, var(--color-accent-amber, #d98a00) 14%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.organize-banner--ok {
+  background: color-mix(in oklab, var(--color-accent-mint, #2f9e6b) 14%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.organize-progress {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 28px 20px;
+}
+
+.organize-progress svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-accent-purple);
+}
+
+.organize-progress strong {
+  display: block;
+  color: var(--color-primary);
+  font-size: 13.5px;
+}
+
+.organize-progress small {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-tertiary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.organize-progress-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--color-elevated);
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.organize-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-accent-purple), var(--color-accent-lilac, #a98cf0));
+  transition: width 400ms var(--ease-panel, ease-out);
+}
+
+.organize-empty {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.organize-empty svg {
+  width: 26px;
+  height: 26px;
+  color: var(--color-accent-mint, #2f9e6b);
+}
+
+.organize-empty strong {
+  color: var(--color-primary);
+  font-size: 14px;
+}
+
+.organize-empty span {
+  color: var(--color-tertiary);
+  font-size: 12px;
+  max-width: 380px;
+  line-height: 1.6;
+}
+
+.organize-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0 4px;
+}
+
+.organize-remaining {
+  margin: 8px 20px;
+  padding: 9px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  background: var(--color-elevated);
+  color: var(--color-tertiary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.organize-group {
+  border-top: 1px solid var(--color-border);
+  padding: 14px 0 6px;
+}
+
+.organize-group:first-child {
+  border-top: 0;
+}
+
+.organize-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px 10px;
+}
+
+.organize-group-head > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--color-accent-purple);
+}
+
+.organize-group-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.organize-group-head strong {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-primary);
+  font-size: 13px;
+}
+
+.organize-group-head small {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-tertiary);
+  font-size: 11px;
+}
+
+.organize-group-toggle {
+  flex: none;
+  padding: 5px 11px;
+  font-size: 11.5px;
+}
+
+.organize-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.organize-list label {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 11px 20px;
+  border-top: 1px solid color-mix(in oklab, var(--color-border) 55%, transparent);
+  cursor: pointer;
+  transition: background-color 140ms var(--ease-click, ease);
+}
+
+.organize-list label:hover {
+  background: var(--color-elevated);
+}
+
+.organize-list label.checked {
+  background: color-mix(in oklab, var(--color-accent-purple) 7%, transparent);
+}
+
+.organize-list input[type="checkbox"] {
+  flex: none;
+  margin-top: 3px;
+  accent-color: var(--color-accent-purple);
+}
+
+.organize-item-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.organize-item-main strong {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.organize-item-path {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  overflow-wrap: anywhere;
+}
+
+.organize-item-path svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  color: var(--color-accent-purple);
+}
+
+.organize-item-reason {
+  color: var(--color-secondary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.organize-item-confidence {
+  flex: none;
+  align-self: center;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-elevated);
+  padding: 2px 8px;
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.organize-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-elevated);
+  padding: 13px 20px;
+}
+
+.organize-foot small {
+  color: var(--color-tertiary);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.organize-foot .confirm-actions {
+  flex: none;
+  margin: 0;
+}
+
+/* ── 回收站抽屉 ─────────────────── */
+
+.trash-drawer {
+  display: flex;
+  flex-direction: column;
+  width: min(520px, calc(100vw - 40px));
+  max-height: min(82vh, 760px);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  box-shadow: 0 30px 70px color-mix(in oklab, var(--color-primary) 32%, transparent);
+  animation: confirm-pop 200ms var(--ease-out-expo, ease-out);
+  overflow: hidden;
+}
+
+.trash-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.trash-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.trash-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid color-mix(in oklab, var(--color-border) 55%, transparent);
+}
+
+.trash-list li:first-child {
+  border-top: 0;
+}
+
+.trash-list .button {
+  flex: none;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.trash-confirm-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-accent-rose) !important;
+}
+
+.trash-confirm-text svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 640px) {
+  .organize-dialog,
+  .trash-drawer {
+    width: calc(100vw - 24px);
+    max-height: 88vh;
+  }
+
+  .organize-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .organize-foot .confirm-actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .organize-dialog,
+  .trash-drawer,
+  .folder-card-delete,
+  .organize-progress-bar span {
+    animation: none;
+    transition: none;
+  }
+}

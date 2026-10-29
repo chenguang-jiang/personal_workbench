@@ -13,6 +13,8 @@ export interface SearchDoc {
   folder: string;
   content: string;
   updatedAt: Date;
+  /** 可选：正文命中判定（由数据库预筛结果提供），存在时不再扫描 content */
+  contentHas?: (token: string) => boolean;
 }
 
 export interface SearchHit {
@@ -61,7 +63,8 @@ export function scoreDoc(doc: SearchDoc, tokens: string[]): SearchHit | null {
     const titleScore = fieldScore(token, title) * WEIGHT.title;
     const tagScore = Math.max(0, ...tags.map((tag) => fieldScore(token, tag))) * WEIGHT.tag;
     const folderScore = fieldScore(token, folder) * WEIGHT.folder;
-    const contentScore = content.includes(token) ? 6 * WEIGHT.content : 0;
+    const contentHit = doc.contentHas ? doc.contentHas(token) : content.includes(token);
+    const contentScore = contentHit ? 6 * WEIGHT.content : 0;
 
     const tokenScore = titleScore + tagScore + folderScore + contentScore;
     if (tokenScore <= 0) return null; // AND 语义：任一词未命中即淘汰

@@ -5,6 +5,8 @@
  * serializeBlock 只读取其中的 <table>，因此不会被写回正文。
  */
 
+import { enhanceMermaidSvg, renderMermaid } from "./mermaid-render";
+
 /** 触发 input 事件，让编辑器标记 dirty（未保存修改） */
 export function markDirty(prose: HTMLElement) {
   prose.dispatchEvent(new Event("input", { bubbles: true }));
@@ -150,21 +152,99 @@ function findInsertionBlock(prose: HTMLElement): Element | null {
  */
 export function insertTableAtSelection(prose: HTMLElement) {
   const wrap = createTable(2, 3);
-  const block = findInsertionBlock(prose);
-
-  if (block && prose.contains(block)) {
-    if (block.parentElement === prose) block.after(wrap);
-    else block.after(wrap);
-  } else {
-    const fragments = prose.querySelectorAll(".reader-markdown-fragment");
-    const last = fragments[fragments.length - 1];
-    if (last) last.appendChild(wrap);
-    else prose.appendChild(wrap);
-  }
-
+  insertBlockAtSelection(prose, wrap);
   const firstCell = wrap.querySelector<HTMLElement>("th, td");
   firstCell?.focus();
   markDirty(prose);
+}
+
+/** 插入即可见的流程图模板：比空源码块更直观，用户在此基础上改 */
+const MERMAID_STARTER = `flowchart TD
+  A([开始]) --> B[处理步骤]
+  B --> C{是否通过}
+  C -->|是| D([结束])
+  C -->|否| B`;
+
+/**
+ * 在光标所在位置插入流程图并立即渲染预览（与阅读器的 MermaidDiagram 同一管线）。
+ * figure 必须是 .reader-prose 的顶层子节点：serializeProse 只在顶层读 data-source。
+ * 保存后正文重渲染，图表自动升级为可交互的完整组件（缩放/全屏/编辑源码）。
+ */
+export async function insertMermaidAtSelection(
+  prose: HTMLElement,
+  theme: string,
+  accent: string,
+) {
+  const figure = document.createElement("figure");
+  figure.className = "mermaid-diagram";
+  figure.dataset.source = MERMAID_STARTER;
+  figure.dataset.status = "loading";
+  figure.setAttribute("contenteditable", "false");
+  const viewport = document.createElement("div");
+  viewport.className = "mermaid-diagram__viewport";
+  const canvas = document.createElement("div");
+  canvas.className = "mermaid-diagram__canvas";
+  canvas.textContent = "正在绘制流程图…";
+  viewport.appendChild(canvas);
+  figure.appendChild(viewport);
+  insertProseLevelBlock(prose, figure);
+  markDirty(prose);
+  const rendered = await renderMermaid(MERMAID_STARTER, theme, accent);
+  // 用户可能在渲染完成前又动了正文：确认 figure 仍在文档里再写结果
+  if (!figure.isConnected) return;
+  if (rendered.svg) {
+    figure.dataset.status = "ready";
+    canvas.innerHTML = rendered.svg;
+    const svg = canvas.querySelector("svg");
+    if (svg) enhanceMermaidSvg(svg);
+  } else {
+    figure.dataset.status = "error";
+    canvas.textContent = "";
+    const errorBox = document.createElement("div");
+    errorBox.className = "mermaid-diagram__error";
+    errorBox.textContent = `流程图渲染失败：${rendered.error.split("\n")[0]}`;
+    canvas.appendChild(errorBox);
+  }
+}
+
+/** 把块插到光标所在顶层块之后（mermaid figure 必须在 prose 顶层） */
+function insertProseLevelBlock(prose: HTMLElement, block: HTMLElement) {
+  const anchor = findProseLevelAnchor(prose);
+  if (anchor && anchor.parentElement === prose) {
+    anchor.after(block);
+    return;
+  }
+  const fragments = prose.querySelectorAll(".reader-markdown-fragment");
+  const last = fragments[fragments.length - 1];
+  if (last?.parentElement === prose) last.after(block);
+  else prose.appendChild(block);
+}
+
+/** 光标所在、且直接挂在 prose 下的元素 */
+function findProseLevelAnchor(prose: HTMLElement): Element | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  let node: Node | null = selection.getRangeAt(0).commonAncestorContainer;
+  while (node && node !== prose) {
+    const parent: HTMLElement | null = node.parentElement;
+    if (!parent) return null;
+    if (parent === prose) return node as Element;
+    node = parent;
+  }
+  return null;
+}
+
+/** 把块插到光标所在块之后；找不到光标位置时落到最后一个 fragment 或 prose 末尾 */
+export function insertBlockAtSelection(prose: HTMLElement, block: HTMLElement) {
+  const anchor = findInsertionBlock(prose);
+  if (anchor && prose.contains(anchor)) {
+    anchor.after(block);
+    return;
+  }
+  const fragments = prose.querySelectorAll(".reader-markdown-fragment");
+  const last = fragments[fragments.length - 1];
+  if (last) last.appendChild(block);
+  else prose.appendChild(block);
 }
 
 export type TableNotice = (message: string, isError?: boolean) => void;

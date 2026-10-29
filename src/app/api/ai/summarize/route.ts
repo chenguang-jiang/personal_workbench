@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { summarizeArticle } from "@/lib/ai";
+import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 export async function POST(req: NextRequest) {
-  const { content } = await req.json();
+  const body = await readJsonObject<{ content?: string }>(req);
+  if (!body) return invalidJsonResponse();
+  const { content } = body;
 
   if (!content) {
     return NextResponse.json(

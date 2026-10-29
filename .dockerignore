@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env
+.env.*
+output
+assets
+docs
+.DS_Store
+*.tsbuildinfo
+.impeccable
+.playwright-cli

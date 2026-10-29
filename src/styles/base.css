@@ -1,0 +1,527 @@
+:root {
+  color-scheme: light;
+  --sidebar-width: 224px;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  /* 动效手感令牌：按压=咔嗒（弹簧刚度≈380/阻尼≈15），面板=滑入（≈250/22）。
+     不支持 linear() 的浏览器用带回弹的 cubic-bezier 近似。 */
+  --ease-click: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-panel: cubic-bezier(0.22, 1, 0.36, 1);
+  --z-sidebar: 30;
+  --z-overlay: 60;
+  --z-dialog: 70;
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --ease-click: linear(
+      0, 0.069, 0.233, 0.437, 0.64, 0.817, 0.954, 1.049, 1.103, 1.125,
+      1.123, 1.106, 1.081, 1.055, 1.031, 1.012, 0.998, 0.989, 0.985, 0.984,
+      0.986, 0.989, 0.992, 0.995, 0.998
+    );
+    --ease-panel: linear(
+      0, 0.037, 0.128, 0.247, 0.376, 0.502, 0.618, 0.719, 0.803, 0.871,
+      0.924, 0.963, 0.991, 1.009, 1.021, 1.026, 1.028, 1.028, 1.025, 1.022,
+      1.018, 1.015, 1.011, 1.008, 1.006
+    );
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  max-width: 100%;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+  background: var(--color-base);
+}
+
+body {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  min-height: 100vh;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+  background: var(--color-base);
+  color: var(--color-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  outline: none;
+}
+
+:where(button, a, input, textarea, select):focus-visible {
+  outline: 2px solid var(--color-accent-purple);
+  outline-offset: 2px;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-accent-purple) 28%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.app-shell {
+  display: flex;
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100vh;
+  overflow-x: clip;
+}
+
+.app-main {
+  container-name: app-content;
+  container-type: inline-size;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: 1;
+  min-height: 100vh;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+}
+
+.page-frame {
+  width: min(100%, 1240px);
+  margin-inline: auto;
+  padding: 52px 46px 80px;
+  animation: page-in 220ms var(--ease-out-expo) both;
+}
+
+.page-frame--wide {
+  width: min(100%, 1440px);
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 30px;
+}
+
+.page-header-copy {
+  max-width: 720px;
+  min-width: 0;
+}
+
+.page-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.page-header--title-actions {
+  display: block;
+}
+
+.page-header--title-actions .page-header-copy {
+  max-width: none;
+}
+
+.micro-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  line-height: 1.5;
+}
+
+.micro-label::before {
+  content: "//";
+  color: var(--color-accent-purple);
+}
+
+.page-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.page-description {
+  max-width: 68ch;
+  margin: 9px 0 0;
+  color: var(--color-secondary);
+  font-size: 14px;
+  line-height: 1.75;
+  text-wrap: pretty;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 22px 16px;
+}
+
+.panel-heading h2,
+.section-heading h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.panel-heading p {
+  margin: 5px 0 0;
+  color: var(--color-tertiary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 180ms var(--ease-out-expo),
+    border-color 180ms var(--ease-out-expo),
+    color 180ms var(--ease-out-expo),
+    transform 180ms var(--ease-click),
+    box-shadow 180ms var(--ease-out-expo);
+}
+
+.button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+}
+
+/* 按下缩到 0.97、约 80ms 内立即生效；松开后由上面的咔嗒弹簧弹回 */
+.button:active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 80ms;
+}
+
+.button-primary {
+  background: var(--color-primary);
+  color: var(--color-base);
+}
+
+.button-primary:hover {
+  background: color-mix(
+    in oklab,
+    var(--color-primary) 90%,
+    var(--color-accent-purple)
+  );
+  box-shadow: 0 7px 16px
+    color-mix(in oklab, var(--color-primary) 14%, transparent);
+}
+
+.button-purple {
+  background: var(--color-accent-purple);
+  color: white;
+}
+
+.button-purple:hover {
+  background: var(--color-accent-purple-dark);
+}
+
+.button-secondary {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+
+.button-secondary:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-elevated);
+}
+
+.icon-button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  cursor: pointer;
+  transition:
+    background-color 180ms var(--ease-out-expo),
+    border-color 180ms var(--ease-out-expo),
+    transform 180ms var(--ease-click);
+}
+
+.icon-button:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-hover);
+}
+
+.icon-button:active {
+  transform: scale(0.94);
+  transition-duration: 80ms;
+}
+
+.icon-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.tag {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: var(--color-elevated);
+  padding: 0 9px;
+  color: var(--color-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.tag--purple {
+  background: var(--color-accent-lilac);
+  color: var(--color-accent-purple-dark);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-accent-green);
+  box-shadow: 0 0 0 4px
+    color-mix(in oklab, var(--color-accent-green) 14%, transparent);
+}
+
+.status-dot--loading,
+.status-dot--starting,
+.status-dot--syncing {
+  background: var(--color-accent-amber);
+  box-shadow: 0 0 0 4px
+    color-mix(in oklab, var(--color-accent-amber) 14%, transparent);
+}
+
+.status-dot--disabled,
+.status-dot--missing {
+  background: var(--color-tertiary);
+  box-shadow: 0 0 0 4px
+    color-mix(in oklab, var(--color-tertiary) 12%, transparent);
+}
+
+.status-dot--error {
+  background: var(--color-accent-rose);
+  box-shadow: 0 0 0 4px
+    color-mix(in oklab, var(--color-accent-rose) 13%, transparent);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.input,
+.select {
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.textarea {
+  min-height: 108px;
+  resize: vertical;
+  padding: 11px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--color-tertiary);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--color-accent-purple);
+  box-shadow: 0 0 0 3px
+    color-mix(in oklab, var(--color-accent-purple) 12%, transparent);
+}
+
+/* ---------- mini-markdown 共享排版（AI 回答气泡：头脑风暴 / 阅读 AI / 题库解析） ----------
+   Tailwind preflight 会剥掉列表符号与表格边框，这里统一恢复并给出基础节奏。 */
+.mini-markdown :is(ul, ol) {
+  margin: 0 0 10px;
+  padding-left: 1.5em;
+}
+
+.mini-markdown ul {
+  list-style: disc outside;
+}
+
+.mini-markdown ol {
+  list-style: decimal outside;
+}
+
+.mini-markdown li {
+  margin: 3px 0;
+  padding-left: 0.15em;
+}
+
+.mini-markdown li > :is(ul, ol) {
+  margin: 3px 0 0;
+}
+
+.mini-markdown blockquote {
+  margin: 0 0 10px;
+  border-left: 3px solid
+    color-mix(in oklab, var(--color-accent-purple) 42%, transparent);
+  padding: 2px 0 2px 12px;
+  color: var(--color-secondary);
+}
+
+.mini-markdown :not(pre) > code {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-elevated);
+  padding: 0.06em 0.32em;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  font-variant-ligatures: none;
+  overflow-wrap: anywhere;
+}
+
+/* pre 用 :where() 置零特异性：让使用方自己的代码块样式优先 */
+:where(.mini-markdown) pre {
+  overflow-x: auto;
+  margin: 0 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-elevated);
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  scrollbar-width: thin;
+}
+
+:where(.mini-markdown) pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+  white-space: pre;
+}
+
+/* 宽表横向滚动，不挤压列宽；表头与斑马纹沿用全局语义色 */
+.mini-table-wrap {
+  overflow-x: auto;
+  margin: 10px 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  scrollbar-width: thin;
+}
+
+.mini-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+}
+
+.mini-markdown th,
+.mini-markdown td {
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding: 7px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.mini-markdown th {
+  background: var(--color-elevated);
+  color: var(--color-secondary);
+  font-size: 0.92em;
+  font-weight: 650;
+}
+
+.mini-markdown tbody tr:nth-child(even) td {
+  background: color-mix(in oklab, var(--color-elevated) 45%, transparent);
+}
+
+.mini-markdown tr:last-child td {
+  border-bottom: 0;
+}
+
+.mini-markdown th:last-child,
+.mini-markdown td:last-child {
+  border-right: 0;
+}

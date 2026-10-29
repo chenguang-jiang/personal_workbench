@@ -7,6 +7,8 @@ import { generateBrainstormTitle } from "@/lib/brainstorm-title";
 import { searchKnowledge } from "@/lib/knowledge-search";
 import { syncObsidianFile } from "@/lib/obsidian-sync";
 import { resolveVaultPath } from "@/lib/obsidian-vault";
+import { uniqueAbsolutePath } from "@/lib/unique-vault-path";
+import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -131,7 +133,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const session = await prisma.brainstormSession.findUnique({ where: { id } });
   if (!session) return NextResponse.json({ error: "会话不存在" }, { status: 404 });
 
-  const body = (await req.json()) as {
+  const body = await readJsonObject<{
     action?: string;
     content?: string;
     folder?: string;
@@ -142,7 +144,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     field?: "boundary" | "decision";
     groundingPolicy?: "strict" | "assisted";
     decision?: DecisionInput;
-  };
+  }>(req);
+  if (!body) return invalidJsonResponse();
 
   switch (body.action) {
     case "grounding-policy": {
@@ -286,7 +289,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     }
 
     case "increment":
-      return writeIncrement(session, body.folder);
+      try {
+        return await writeIncrement(session, body.folder);
+      } catch (error) {
+        console.error("[brainstorm] 写回增量失败", { sessionId: id, error });
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "写回知识库失败" },
+          { status: 500 },
+        );
+      }
 
     case "integrate-reference":
       return integrateReference(session, body.refId);
@@ -396,38 +407,77 @@ async function streamMessage(
   }
 
   // tee：一路流给客户端，另一路后台独立消费并落库——客户端中途断开也不丢回复
-  const [clientStream, persistStream] = upstream.tee();
-  const decoder = new TextDecoder();
-  void (async () => {
-    const reader = persistStream.getReader();
-    let accumulated = "";
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
-      }
-    } catch {
-      return;
-    }
-    if (accumulated.trim()) {
-      const title = await titlePromise;
-      await prisma.brainstormSession
-        .update({
-          where: { id: session.id },
-          data: {
-            messages: [...history, { role: "assistant", content: accumulated }] as never,
-            title,
-            status: "active",
-          },
-        })
-        .catch(() => {});
-    }
-  })();
+  const [clientSource, persistStream] = upstream.tee();
+  void persistStreamedTurn(session.id, history, titlePromise, persistStream);
 
-  return new Response(clientStream, {
+  return new Response(withInBandError(clientSource), {
     headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
   });
+}
+
+// 流式错误的带内标记：客户端（brainstorm/page.tsx）识别后去掉标记并展示错误，保持两处字面量一致
+const STREAM_ERROR_MARKER = "\u0000[[DAWN_STREAM_ERROR]]";
+
+/** 上游出错时不直接中断连接，而是追加带内错误标记再正常结束，让客户端拿到可读的错误信息 */
+function withInBandError(source: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  const reader = source.getReader();
+  const encoder = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) controller.close();
+        else controller.enqueue(value);
+      } catch (error) {
+        const message = error instanceof Error && error.message ? error.message : "AI 输出中断";
+        controller.enqueue(encoder.encode(`${STREAM_ERROR_MARKER}${message}`));
+        controller.close();
+      }
+    },
+    cancel(reason) {
+      // 只取消客户端分支；落库分支仍会把回复读完
+      void reader.cancel(reason).catch(() => null);
+    },
+  });
+}
+
+/**
+ * 后台落库：用户本轮提问始终保存；只有完整结束且非空的回答才作为 assistant 轮次保存，
+ * 失败的半截回答不当作完整回答写入。
+ */
+async function persistStreamedTurn(
+  sessionId: string,
+  history: SessionMessages,
+  titlePromise: Promise<string>,
+  stream: ReadableStream<Uint8Array>,
+) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let accumulated = "";
+  let failed = false;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      accumulated += decoder.decode(value, { stream: true });
+    }
+  } catch (error) {
+    failed = true;
+    console.error("[brainstorm] 推演流中断", { sessionId, error });
+  }
+  const complete = !failed && accumulated.trim().length > 0;
+  const messages: SessionMessages = complete
+    ? [...history, { role: "assistant", content: accumulated }]
+    : history;
+  try {
+    const title = await titlePromise;
+    await prisma.brainstormSession.update({
+      where: { id: sessionId },
+      data: { messages: messages as never, title, status: "active" },
+    });
+  } catch (error) {
+    console.error("[brainstorm] 推演结果落库失败", { sessionId, error });
+  }
 }
 
 /** 挂载参考 → 注入推演上下文（文章全文节选 / 文件夹文章节选） */
@@ -670,8 +720,9 @@ async function writeIncrement(
   const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(
     now.getDate(),
   ).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
-  const fileName = `头脑风暴-${stamp}.md`;
-  const filePath = path.join(target.absolutePath, fileName);
+  // 同一分钟内多次写回时自动追加 -2、-3…，避免 wx 写入因 EEXIST 失败
+  const filePath = uniqueAbsolutePath(path.join(target.absolutePath, `头脑风暴-${stamp}.md`));
+  const fileName = path.basename(filePath);
 
   const lines: string[] = [
     "---",

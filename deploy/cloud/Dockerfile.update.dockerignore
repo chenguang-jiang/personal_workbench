@@ -1,0 +1,11 @@
+.env
+.env.*
+.git
+output
+src
+docs
+assets
+node_modules
+*.tsbuildinfo
+.next/cache
+.next/dev

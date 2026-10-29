@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Database, Highlighter, StickyNote } from "lucide-react";
+import { Bold, Database, Highlighter, MessageSquareText, StickyNote } from "lucide-react";
 
 export interface SelectionPosition {
   x: number;
@@ -12,10 +12,11 @@ export interface SelectionPosition {
 
 interface HighlightToolbarProps {
   position: SelectionPosition | null;
-  onDawnAgent: (text: string, context: string) => void;
   onHighlight: (text: string, color: string) => void;
   onNote: (text: string, context: string) => void;
   onIngest: (text: string, context: string) => void;
+  onAskAi: (text: string, context: string) => void;
+  onBold: () => void;
 }
 
 const HIGHLIGHT_COLORS = [
@@ -27,10 +28,11 @@ const HIGHLIGHT_COLORS = [
 
 export function HighlightToolbar({
   position,
-  onDawnAgent,
   onHighlight,
   onNote,
   onIngest,
+  onAskAi,
+  onBold,
 }: HighlightToolbarProps) {
   const [showColors, setShowColors] = useState(false);
 
@@ -40,7 +42,7 @@ export function HighlightToolbar({
     <div
       className="selection-toolbar"
       style={{
-        left: Math.min(position.x, window.innerWidth - 360),
+        left: Math.min(position.x, window.innerWidth - 440),
         top: Math.max(position.y - 50, 10),
       }}
       role="toolbar"
@@ -72,10 +74,16 @@ export function HighlightToolbar({
       ) : (
         <>
           <ToolbarButton
-            icon={Bot}
-            label="Dawn Agent"
+            icon={MessageSquareText}
+            label="问 AI"
             color="var(--color-accent-purple)"
-            onClick={() => onDawnAgent(position.text, position.context)}
+            onClick={() => onAskAi(position.text, position.context)}
+          />
+          <ToolbarButton
+            icon={Bold}
+            label="加粗"
+            color="var(--color-primary)"
+            onClick={onBold}
           />
           <ToolbarButton
             icon={Highlighter}

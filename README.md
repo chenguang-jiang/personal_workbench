@@ -75,7 +75,6 @@ npm run obsidian:sync
 - **随手记 / 头脑风暴**：碎片捕获与 AI 推演
 - **每日热点 / 每日精读**：信号聚合与导读
 - **题库机**：每日题集、完成标记、提醒升级、错题本
-- **Dawn Agent / DeepSeek 工作台**：本地 agent 会话与 harness 接入
 
 ## 技术栈
 

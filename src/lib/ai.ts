@@ -32,6 +32,22 @@ function getOpenAiModel() {
   return openai.chat(model);
 }
 
+/**
+ * DeepSeek 兜底：云端部署了 DEEPSEEK_API_KEY 但没有 OPENAI_API_KEY 时，
+ * 用 DeepSeek 官方 API（OpenAI 兼容）为阅读 AI 和头脑风暴提供推理能力。
+ */
+function deepSeekConfig() {
+  return {
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    baseURL: "https://api.deepseek.com",
+    model: process.env.DEEPSEEK_MODEL || "deepseek-flash",
+  };
+}
+
+function hasDeepSeek(): boolean {
+  return Boolean(process.env.DEEPSEEK_API_KEY);
+}
+
 export interface AiStatus {
   provider: "openai" | "ollama" | "none";
   model: string;
@@ -59,12 +75,46 @@ async function openAiReachable(): Promise<boolean> {
   return ok;
 }
 
-/** 探测当前 AI 后端是否可用（OpenAI key 优先，其次本地 Ollama） */
+// DeepSeek 可达性探测（5 分钟缓存）
+let deepSeekProbeCache: { at: number; ok: boolean } | null = null;
+async function deepSeekReachable(): Promise<boolean> {
+  if (deepSeekProbeCache && Date.now() - deepSeekProbeCache.at < 5 * 60_000) return deepSeekProbeCache.ok;
+  let ok = false;
+  try {
+    const { apiKey, baseURL, model } = deepSeekConfig();
+    const response = await fetch(`${baseURL}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(8000),
+      body: JSON.stringify({ model, messages: [{ role: "user", content: "ping" }], max_tokens: 1, stream: false }),
+    });
+    ok = response.ok;
+  } catch {
+    ok = false;
+  }
+  deepSeekProbeCache = { at: Date.now(), ok };
+  return ok;
+}
+
+/** 获取当前可用的 AI 后端标签，供 runStream/chatOnce 决策 */
+async function getAvailableProvider(): Promise<"openai" | "deepseek" | "ollama"> {
+  if (process.env.OPENAI_API_KEY && (await openAiReachable())) return "openai";
+  if (hasDeepSeek() && (await deepSeekReachable())) return "deepseek";
+  return "ollama";
+}
+
+/** 探测当前 AI 后端是否可用（OpenAI key 优先，其次 DeepSeek，最后本地 Ollama） */
 export async function getAiStatus(): Promise<AiStatus> {
   if (process.env.OPENAI_API_KEY) {
     const { model } = openAiConfig();
     if (await openAiReachable()) {
       return { provider: "openai", model, available: true, detail: `云端 · ${model}` };
+    }
+  }
+  if (hasDeepSeek()) {
+    const { model } = deepSeekConfig();
+    if (await deepSeekReachable()) {
+      return { provider: "openai", model, available: true, detail: `DeepSeek · ${model}` };
     }
   }
   const { host, model } = ollamaConfig();
@@ -98,17 +148,73 @@ export async function getAiStatus(): Promise<AiStatus> {
 export interface ChatTurn {
   role: "user" | "assistant";
   content: string;
+  /** 该轮附带的图片（data URL）；仅视觉模型会真正收到，文本模型由调用方降级为文字说明 */
+  images?: string[];
 }
 
-function wrapTextStream(textStream: AsyncIterable<string>): ReadableStream<Uint8Array> {
+/** 常见视觉模型族；OpenAI 兼容代理后面的纯文本模型（如 qwen-max）不在此列 */
+const VISION_MODEL_PATTERN = /(?:gpt-4o|gpt-4\.1|gpt-5|^o[134]|claude|gemini|qwen[-.]?vl|llava|vision)/i;
+
+/**
+ * 当前可用后端是否支持看图：仅 OpenAI 兼容端点可能多模态，且模型名需命中视觉族；
+ * DAWNKB_AI_VISION=1/0 可强制开关。文本后端（DeepSeek/Ollama）一律按纯文本处理。
+ */
+export async function aiSupportsVision(): Promise<boolean> {
+  if (process.env.DAWNKB_AI_VISION === "0") return false;
+  if ((await getAvailableProvider()) !== "openai") return false;
+  if (process.env.DAWNKB_AI_VISION === "1") return true;
+  return VISION_MODEL_PATTERN.test(openAiConfig().model);
+}
+
+/** 视觉消息：图片以 content parts 发送；无图轮次原样返回 */
+function toVisionMessage(turn: ChatTurn) {
+  if (turn.role !== "user" || !turn.images?.length) return turn;
+  return {
+    role: turn.role,
+    content: [
+      { type: "text" as const, text: turn.content },
+      ...turn.images.map((image) => ({ type: "image" as const, image })),
+    ],
+  };
+}
+
+/** 纯文本后端的消息：剥离图片字段，避免上游 400 */
+function toTextMessage(turn: ChatTurn) {
+  if (!turn.images?.length) return turn;
+  return { role: turn.role, content: turn.content };
+}
+
+function streamErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error) return error;
+  return "AI 流式输出失败";
+}
+
+/**
+ * 把 ai-sdk 的全量事件流转成纯文本字节流。
+ * 模型/网络错误以 error 事件出现在流中（不会抛出），必须显式 controller.error()，
+ * 否则文本流会“正常结束”，客户端只能看到空白或被截断的回答。
+ */
+function wrapTextStream(
+  parts: AsyncIterable<{ type: string; text?: string; error?: unknown }>,
+): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const chunk of textStream) controller.enqueue(encoder.encode(chunk));
-      } finally {
-        controller.close();
+        for await (const part of parts) {
+          if (part.type === "text-delta" && part.text) {
+            controller.enqueue(encoder.encode(part.text));
+          } else if (part.type === "error") {
+            throw new Error(streamErrorMessage(part.error));
+          }
+        }
+      } catch (error) {
+        console.error("[ai] 流式输出失败", error);
+        controller.error(error instanceof Error ? error : new Error(streamErrorMessage(error)));
+        return;
       }
+      controller.close();
     },
   });
 }
@@ -155,15 +261,84 @@ function wrapOllamaStream(body: ReadableStream<Uint8Array>): ReadableStream<Uint
   });
 }
 
-/** 统一流式入口：OpenAI 走 ai-sdk，Ollama 走原生接口（think:false 关闭思考提速） */
-async function runStream(options: {
+/** 把 OpenAI/DeepSeek 兼容的 SSE 流转成纯文本字节流 */
+function wrapOpenAiStream(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let buffer = "";
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith(":")) continue;
+            if (!trimmed.startsWith("data:")) continue;
+            const data = trimmed.slice(5).trim();
+            if (data === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(data) as {
+                choices?: { delta?: { content?: string } }[];
+                error?: { message?: string } | string;
+              };
+              if (parsed.error) {
+                const msg = typeof parsed.error === "string" ? parsed.error : parsed.error.message;
+                throw new Error(msg || "DeepSeek 流式错误");
+              }
+              const content = parsed.choices?.[0]?.delta?.content ?? "";
+              if (content) controller.enqueue(encoder.encode(content));
+            } catch (error) {
+              if (error instanceof Error && error.message !== "Unexpected end of JSON input") {
+                throw error;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        controller.error(error);
+        return;
+      }
+      controller.close();
+    },
+  });
+}
+
+/** 统一流式入口：OpenAI 走 ai-sdk，DeepSeek 走原生流式，Ollama 走原生接口（think:false 关闭思考提速） */
+export async function runStream(options: {
   system: string;
   messages: ChatTurn[];
 }): Promise<ReadableStream<Uint8Array>> {
   const { system, messages } = options;
-  if (process.env.OPENAI_API_KEY && (await openAiReachable())) {
-    const result = streamText({ model: getOpenAiModel(), system, messages });
-    return wrapTextStream(result.textStream);
+  const provider = await getAvailableProvider();
+  if (provider === "openai") {
+    const result = streamText({
+      model: getOpenAiModel(),
+      system,
+      messages: messages.map(toVisionMessage),
+      // 错误已通过 stream 中的 error 事件交给 wrapTextStream 传播，这里只做服务端日志
+      onError: ({ error }) => console.error("[ai] streamText 错误", error),
+    });
+    return wrapTextStream(result.stream);
+  }
+  if (provider === "deepseek") {
+    const { apiKey, baseURL, model } = deepSeekConfig();
+    const upstream = await fetch(`${baseURL}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        stream: true,
+        messages: [{ role: "system", content: system }, ...messages.map(toTextMessage)],
+      }),
+    });
+    if (!upstream.ok || !upstream.body) throw new Error(`DeepSeek 请求失败 (${upstream.status})`);
+    return wrapOpenAiStream(upstream.body);
   }
   const { host, model } = ollamaConfig();
   // 注意：此版本 Ollama 会忽略顶层 system 参数，必须以 system 角色消息发送
@@ -174,7 +349,7 @@ async function runStream(options: {
       model,
       think: false,
       stream: true,
-      messages: [{ role: "system", content: system }, ...messages],
+      messages: [{ role: "system", content: system }, ...messages.map(toTextMessage)],
     }),
   });
   if (!upstream.ok || !upstream.body) {
@@ -190,14 +365,30 @@ export async function chatOnce(options: {
   maxTokens?: number;
 }): Promise<string> {
   const { system, messages, maxTokens = 700 } = options;
-  if (process.env.OPENAI_API_KEY && (await openAiReachable())) {
+  const provider = await getAvailableProvider();
+  if (provider === "openai") {
     const result = await generateText({
       model: getOpenAiModel(),
       system,
-      messages,
+      messages: messages.map(toVisionMessage),
       maxOutputTokens: maxTokens,
     });
     return result.text;
+  }
+  if (provider === "deepseek") {
+    const { apiKey, baseURL, model } = deepSeekConfig();
+    const response = await fetch(`${baseURL}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        messages: [{ role: "system", content: system }, ...messages.map(toTextMessage)],
+      }),
+    });
+    if (!response.ok) throw new Error(`DeepSeek 请求失败 (${response.status})`);
+    const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+    return data.choices?.[0]?.message?.content ?? "";
   }
   const { host, model } = ollamaConfig();
   const response = await fetch(`${host}/api/chat`, {
@@ -207,7 +398,7 @@ export async function chatOnce(options: {
       model,
       think: false,
       stream: false,
-      messages: [{ role: "system", content: system }, ...messages],
+      messages: [{ role: "system", content: system }, ...messages.map(toTextMessage)],
     }),
   });
   if (!response.ok) throw new Error(`Ollama 请求失败 (${response.status})`);
@@ -325,13 +516,32 @@ summary 为一句话摘要（不超过 30 字）；tags 最多 3 个关键词；
 ${content.slice(0, 4000)}`;
 
   let text: string;
-  if (process.env.OPENAI_API_KEY && (await openAiReachable())) {
+  const provider = await getAvailableProvider();
+  if (provider === "openai") {
     const result = await generateText({
       model: getOpenAiModel(),
       system: "你是知识整理助手。只输出 JSON，不要输出其他内容。",
       prompt,
     });
     text = result.text;
+  } else if (provider === "deepseek") {
+    const { apiKey, baseURL, model } = deepSeekConfig();
+    const response = await fetch(`${baseURL}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        max_tokens: 800,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "你是知识整理助手。只输出 JSON，不要输出其他内容。" },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+    if (!response.ok) throw new Error(`DeepSeek 请求失败 (${response.status})`);
+    const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+    text = data.choices?.[0]?.message?.content ?? "";
   } else {
     const { host, model } = ollamaConfig();
     const response = await fetch(`${host}/api/chat`, {

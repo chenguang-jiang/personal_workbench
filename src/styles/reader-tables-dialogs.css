@@ -1,0 +1,560 @@
+/* ── 表格编辑：编辑态工具栏与单元格焦点 ─────────────────── */
+
+.reader-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-elevated);
+}
+
+.table-tool {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 7px;
+  background: var(--color-surface);
+  padding: 3px 9px;
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.table-tool:hover {
+  border-color: var(--color-accent-purple);
+  background: var(--color-accent-lilac);
+  color: var(--color-accent-purple-dark);
+}
+
+.table-tool--danger:hover {
+  border-color: var(--color-accent-rose);
+  background: var(--color-accent-rose);
+  color: #fff;
+}
+
+.reader-prose--editing td:focus,
+.reader-prose--editing th:focus {
+  outline: 2px solid var(--color-accent-purple);
+  outline-offset: -2px;
+  background: color-mix(
+    in oklab,
+    var(--color-accent-purple) 7%,
+    var(--color-surface)
+  );
+}
+
+/* ── 编辑提示条内的小工具按钮（插入表格） ─────────────────── */
+
+.reader-edit-hint {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.reader-hint-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reader-hint-tool {
+  display: inline-flex;
+  flex: none;
+  gap: 5px;
+  align-items: center;
+  border: 1px solid #4a3f68;
+  border-radius: 999px;
+  background: #2a2140;
+  padding: 2px 11px;
+  color: #e6dcfa;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.reader-hint-tool svg {
+  width: 11px;
+  height: 11px;
+}
+
+.reader-hint-tool:hover {
+  border-color: #9c79e9;
+  background: #3a2f58;
+}
+
+.reader-edit-hint--error .reader-hint-tool {
+  border-color: #8f3347;
+  background: #4a1c28;
+}
+
+/* 提示条最左的状态点：琥珀=有未保存修改，紫=干净 */
+.reader-hint-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #8f7bbd;
+  transition: background 200ms var(--ease-out-expo);
+}
+
+.reader-hint-dot--dirty {
+  background: var(--color-accent-amber);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-accent-amber) 22%, transparent);
+  animation: hint-dot-breathe 2.2s ease-in-out infinite;
+}
+
+@keyframes hint-dot-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent-amber) 14%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--color-accent-amber) 24%, transparent);
+  }
+}
+
+/* ── Mermaid 源码编辑器（编辑态图块内） ─────────────────── */
+
+.mermaid-diagram__unsaved {
+  margin-left: 8px;
+  color: var(--color-accent-amber);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.mermaid-diagram__edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid color-mix(in oklab, var(--color-accent-purple) 34%, transparent);
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--color-accent-purple) 9%, var(--color-surface));
+  margin-left: 4px;
+  padding: 2px 9px;
+  color: var(--color-accent-purple-dark);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 150ms var(--ease-out-expo),
+    border-color 150ms var(--ease-out-expo),
+    transform 150ms var(--ease-out-expo);
+}
+
+.mermaid-diagram__edit-btn:hover {
+  border-color: var(--color-accent-purple);
+  background: color-mix(in oklab, var(--color-accent-purple) 16%, var(--color-surface));
+}
+
+.mermaid-diagram__edit-btn:active {
+  transform: scale(0.96);
+}
+
+.mermaid-diagram__edit-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.mermaid-diagram__editor {
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-elevated);
+  padding: 12px 14px;
+  animation: editor-slide-in 220ms var(--ease-out-expo) both;
+}
+
+@keyframes editor-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mermaid-diagram__editor-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.mermaid-diagram__editor-head > span {
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+}
+
+.mermaid-diagram__editor-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.mermaid-editor-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 7px;
+  background: var(--color-surface);
+  padding: 3px 10px;
+  color: var(--color-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 140ms var(--ease-out-expo),
+    border-color 140ms var(--ease-out-expo),
+    color 140ms var(--ease-out-expo),
+    transform 140ms var(--ease-out-expo);
+}
+
+.mermaid-editor-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.mermaid-editor-btn:hover:not(:disabled) {
+  border-color: var(--color-accent-purple);
+  color: var(--color-accent-purple-dark);
+}
+
+.mermaid-editor-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.mermaid-editor-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mermaid-editor-btn--apply {
+  border-color: transparent;
+  background: var(--color-accent-purple);
+  color: #fff;
+}
+
+.mermaid-editor-btn--apply:hover:not(:disabled) {
+  background: var(--color-accent-purple-dark);
+  border-color: transparent;
+  color: #fff;
+}
+
+.mermaid-diagram__source {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  padding: 10px 12px;
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  resize: vertical;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.mermaid-diagram__source:focus {
+  border-color: var(--color-accent-purple);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent-purple) 12%, transparent);
+}
+
+.mermaid-diagram__editor-error {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 8px 0 0;
+  color: var(--color-accent-amber);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.mermaid-diagram__editor-error svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+
+/* ── 书架卡片删除按钮 ─────────────────── */
+
+.book-card-shell {
+  position: relative;
+  min-width: 0;
+}
+
+.book-card-shell .book-card {
+  height: 100%;
+}
+
+.book-card-delete {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 3;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, var(--color-accent-rose) 32%, transparent);
+  border-radius: 9px;
+  background: color-mix(in oklab, var(--color-surface) 86%, transparent);
+  color: var(--color-tertiary);
+  opacity: 0;
+  transform: translateY(-4px);
+  cursor: pointer;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.book-card-delete svg {
+  width: 13px;
+  height: 13px;
+}
+
+.book-card-shell:hover .book-card-delete,
+.book-card-delete:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.book-card-delete:hover {
+  border-color: var(--color-accent-rose);
+  background: var(--color-accent-rose);
+  color: #fff;
+}
+
+/* 阅读器顶栏危险操作按钮 */
+.reader-icon-button--danger:hover {
+  background: color-mix(in oklab, var(--color-accent-rose) 12%, transparent);
+  color: var(--color-accent-rose);
+}
+
+/* ── 删除文档确认弹窗 ─────────────────── */
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklab, var(--color-primary) 34%, transparent);
+  backdrop-filter: blur(5px);
+  animation: confirm-fade 160ms ease;
+}
+
+@keyframes confirm-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.confirm-dialog {
+  width: min(430px, calc(100vw - 48px));
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  padding: 26px 26px 22px;
+  box-shadow: 0 30px 70px
+    color-mix(in oklab, var(--color-primary) 32%, transparent);
+  animation: confirm-pop 200ms var(--ease-out-expo, ease-out);
+}
+
+@keyframes confirm-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.confirm-dialog-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, var(--color-accent-rose) 30%, transparent);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--color-accent-rose) 10%, var(--color-surface));
+  margin-bottom: 14px;
+  color: var(--color-accent-rose);
+}
+
+.confirm-dialog-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.confirm-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--color-primary);
+  overflow-wrap: anywhere;
+}
+
+.confirm-dialog > p {
+  margin: 0 0 16px;
+  color: var(--color-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.confirm-checkbox {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-elevated);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+
+.confirm-checkbox input {
+  margin-top: 2px;
+  accent-color: var(--color-accent-rose);
+}
+
+.confirm-checkbox strong {
+  display: block;
+  color: var(--color-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.confirm-checkbox small {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-tertiary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.confirm-error {
+  margin: 0 0 14px;
+  color: var(--color-accent-rose);
+  font-size: 12px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.confirm-delete-btn {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-accent-rose);
+  padding: 9px 16px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    filter 140ms ease,
+    transform 140ms ease;
+}
+
+.confirm-delete-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.confirm-delete-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.confirm-delete-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.confirm-delete-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* 编辑态：选中行 / 选中列高亮（点选单元格后，删选中行/列的目标一目了然） */
+
+.reader-prose--editing tr.table-row-selected > td,
+.reader-prose--editing tr.table-row-selected > th {
+  background: color-mix(
+    in oklab,
+    var(--color-accent-purple) 9%,
+    var(--color-surface)
+  );
+}
+
+.reader-prose--editing td.table-col-selected,
+.reader-prose--editing th.table-col-selected {
+  background: color-mix(
+    in oklab,
+    var(--color-accent-purple) 9%,
+    var(--color-surface)
+  );
+}
+
+.reader-prose--editing td.table-col-selected.table-row-selected,
+.reader-prose--editing tr.table-row-selected td:focus {
+  background: color-mix(
+    in oklab,
+    var(--color-accent-purple) 14%,
+    var(--color-surface)
+  );
+}
+
+/* 卡片收藏角标：已收藏的文章在书架上常显星标 */
+.book-card-star {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 3;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--color-accent-lilac) 88%, transparent);
+  color: var(--color-accent-purple);
+  pointer-events: none;
+}
+
+.book-card-star svg {
+  width: 13px;
+  height: 13px;
+}

@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { explainText } from "@/lib/ai";
+import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 export async function POST(req: NextRequest) {
-  const { text, context, question, content } = await req.json();
+  const body = await readJsonObject<{
+    text?: string;
+    context?: string;
+    question?: string;
+    content?: string;
+  }>(req);
+  if (!body) return invalidJsonResponse();
+  const { text, context, question, content } = body;
 
   if (!text) {
     return NextResponse.json({ error: "text is required" }, { status: 400 });

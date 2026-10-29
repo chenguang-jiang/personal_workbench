@@ -1,0 +1,236 @@
+/* Knowledge graph */
+.graph-workspace {
+  display: grid;
+  min-height: 660px;
+  grid-template-columns: 210px minmax(360px, 1fr) 268px;
+  overflow: hidden;
+}
+
+.graph-filters,
+.graph-detail {
+  background: color-mix(
+    in oklab,
+    var(--color-surface) 94%,
+    var(--color-elevated)
+  );
+  padding: 22px 18px;
+}
+
+.graph-filters {
+  border-right: 1px solid var(--color-border);
+}
+
+.graph-detail {
+  border-left: 1px solid var(--color-border);
+}
+
+.graph-filters h2,
+.graph-detail h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 19px;
+}
+
+.graph-group-list {
+  display: grid;
+  gap: 2px;
+  margin-top: 24px;
+}
+
+.graph-group {
+  display: grid;
+  min-height: 38px;
+  grid-template-columns: 7px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0 9px;
+  color: var(--color-secondary);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.graph-group:hover,
+.graph-group--active {
+  background: var(--color-accent-lilac);
+  color: var(--color-accent-purple-dark);
+}
+
+.graph-group > span:first-child {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.graph-group strong {
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.graph-help {
+  display: grid;
+  gap: 8px;
+  margin-top: 28px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+  color: var(--color-tertiary);
+  font-size: 11.5px;
+}
+
+.graph-canvas-shell {
+  position: relative;
+  min-width: 0;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-primary) 8%, transparent) 0.65px,
+    transparent 0.7px
+  );
+  background-size: 18px 18px;
+}
+
+.graph-search {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  width: min(calc(100% - 36px), 390px);
+  height: 40px;
+  align-items: center;
+  gap: 9px;
+  transform: translateX(-50%);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--color-surface) 95%, transparent);
+  padding: 0 12px;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+}
+
+.graph-search svg {
+  width: 15px;
+  color: var(--color-tertiary);
+}
+
+.graph-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+}
+
+.graph-search kbd {
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  padding: 2px 5px;
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.graph-live-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.graph-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: color-mix(in oklab, var(--color-surface) 76%, transparent);
+  color: var(--color-secondary);
+  font-size: 11px;
+}
+
+.graph-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.graph-detail h2 {
+  margin-top: 16px;
+  line-height: 1.35;
+}
+
+.graph-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.graph-tags span {
+  border-radius: 999px;
+  background: var(--color-elevated);
+  padding: 4px 7px;
+  color: var(--color-secondary);
+  font-size: 11.5px;
+}
+
+.graph-related-title {
+  margin: 26px 0 8px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 9px;
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+.graph-related-list {
+  display: grid;
+  gap: 2px;
+}
+
+.graph-related-list button {
+  display: grid;
+  min-height: 43px;
+  grid-template-columns: 14px 1fr 12px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 5px 7px;
+  color: var(--color-secondary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-related-list button:hover {
+  background: var(--color-accent-lilac);
+  color: var(--color-primary);
+}
+
+.graph-related-list svg {
+  width: 13px;
+  height: 13px;
+  color: var(--color-tertiary);
+}
+
+.graph-related-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-empty {
+  color: var(--color-tertiary);
+  font-size: 11px;
+  line-height: 1.6;
+}

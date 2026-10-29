@@ -4,7 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { listVaultFolders, resolveVaultPath } from "@/lib/obsidian-vault";
+import { getVaultConfig } from "@/lib/obsidian-sync";
+import { listVaultFolders } from "@/lib/obsidian-vault";
 
 const JCG_URL_PREFIX = "obsidian://JCG/";
 
@@ -12,12 +13,13 @@ type DashboardArticle = {
   id: string;
   title: string;
   url: string | null;
-  content: string | null;
   tags: string[];
   updatedAt: Date;
   createdAt: Date;
   _count: { notes: number; highlights: number };
 };
+
+type FileTimes = { modifiedAt: Date; bornAt: Date };
 
 export type DashboardActivity = {
   id: string;
@@ -63,47 +65,81 @@ function getSourcePath(url: string | null) {
   return folder === "." ? "JCG" : folder;
 }
 
-// 文件出生时间：编辑/移动/改名都不变，才是“新沉淀”的真实信号；DB createdAt 会被移动重置
-function getFileBornAt(article: DashboardArticle) {
-  if (!article.url?.startsWith("obsidian://")) return article.createdAt;
+// 一次 stat 同时取出生时间与修改时间（并行异步，不再逐篇 statSync 两次）
+// 出生时间：编辑/移动/改名都不变，才是“新沉淀”的真实信号；DB createdAt 会被移动重置
+// 修改时间：以文件 mtime 为准（阅读进度等 DB 更新不算“更新”，不能污染最近列表）
+async function getFileTimes(article: DashboardArticle, vaultPath: string): Promise<FileTimes> {
+  const fallback = { modifiedAt: article.updatedAt, bornAt: article.createdAt };
+  if (!article.url?.startsWith("obsidian://")) return fallback;
+  const relativePath = article.url.slice("obsidian://".length);
+  const absolutePath = path.resolve(vaultPath, relativePath);
+  const inside = path.relative(vaultPath, absolutePath);
+  if (inside.startsWith("..") || path.isAbsolute(inside)) return fallback;
   try {
-    const relativePath = article.url.slice("obsidian://".length);
-    const resolved = resolveVaultPath(relativePath);
-    const birthtime = fs.statSync(resolved.absolutePath).birthtime;
-    return birthtime.getTime() > 0 ? birthtime : article.createdAt;
+    const stat = await fs.promises.stat(absolutePath);
+    return {
+      modifiedAt: stat.mtime,
+      bornAt: stat.birthtime.getTime() > 0 ? stat.birthtime : article.createdAt,
+    };
   } catch {
-    return article.createdAt;
+    return fallback;
   }
 }
 
-// 以文件 mtime 为准（阅读进度等 DB 更新不算“更新”，不能污染最近列表）
-function getFileModifiedAt(article: DashboardArticle) {
-  if (!article.url?.startsWith("obsidian://")) return article.updatedAt;
-  try {
-    const relativePath = article.url.slice("obsidian://".length);
-    const resolved = resolveVaultPath(relativePath);
-    return fs.statSync(resolved.absolutePath).mtime;
-  } catch {
-    return article.updatedAt;
-  }
+// 正文 wikilink 计数在 Postgres 内完成（与原 JS 正则 /\[\[([^\]|#]+)/g 等价），不再把全部正文拉回 Node
+const WIKILINK_PATTERN = "\\[\\[[^]|#]+";
+
+async function countJcgWikiLinks() {
+  const rows = await prisma.$queryRaw<Array<{ links: bigint | null; linked: bigint | null }>>`
+    SELECT
+      COALESCE(SUM((SELECT count(*) FROM regexp_matches("content", ${WIKILINK_PATTERN}, 'g'))), 0) AS links,
+      COUNT(*) FILTER (WHERE "content" ~ ${WIKILINK_PATTERN}) AS linked
+    FROM "Article"
+    WHERE "source" = 'obsidian' AND "url" LIKE ${`${JCG_URL_PREFIX}%`}
+  `;
+  return { linkCount: Number(rows[0]?.links ?? 0), linkedArticleCount: Number(rows[0]?.linked ?? 0) };
 }
 
-function countWikiLinks(content: string | null) {
-  if (!content) return 0;
-  return Array.from(content.matchAll(/\[\[([^\]|#]+)/g)).length;
+const EMPTY_GRAPH_PREVIEW: GraphPreview = { nodes: [], edges: [] };
+
+function emptyDashboardData(vaultName: string): DashboardData {
+  return {
+    vaultName,
+    articleCount: 0,
+    folderCount: 0,
+    tagCount: 0,
+    linkCount: 0,
+    annotationCount: 0,
+    updatedThisWeek: 0,
+    linkedArticleCount: 0,
+    annotatedArticleCount: 0,
+    updatedThisMonth: 0,
+    recent: [],
+    fresh: [],
+    graphPreview: EMPTY_GRAPH_PREVIEW,
+  };
 }
 
 const PREVIEW_NODE_LIMIT = 22;
 
 // 从真实关系表里取连接度最高的节点子图，做确定性力导向布局，作为“正在生长”预览
-async function buildGraphPreview(
-  scoped: Array<{ title: string; modifiedAt: Date }>,
-  oneWeekAgo: number,
-): Promise<GraphPreview> {
-  const [nodes, relations] = await Promise.all([
+type GraphSource = {
+  nodes: Array<{ id: string; title: string }>;
+  relations: Array<{ fromId: string; toId: string }>;
+};
+
+function loadGraphSource(): Promise<GraphSource> {
+  return Promise.all([
     prisma.knowledgeNode.findMany({ select: { id: true, title: true } }),
     prisma.knowledgeRelation.findMany({ select: { fromId: true, toId: true } }),
-  ]);
+  ]).then(([nodes, relations]) => ({ nodes, relations }));
+}
+
+function buildGraphPreview(
+  { nodes, relations }: GraphSource,
+  scoped: Array<{ title: string; modifiedAt: Date }>,
+  oneWeekAgo: number,
+): GraphPreview {
 
   const mtimeByTitle = new Map(scoped.map((item) => [item.title, item.modifiedAt]));
   const titleById = new Map(nodes.map((node) => [node.id, node.title]));
@@ -127,7 +163,7 @@ async function buildGraphPreview(
         (titleById.get(a) ?? "").localeCompare(titleById.get(b) ?? ""),
     )
     .slice(0, PREVIEW_NODE_LIMIT);
-  if (selected.length < 2) return { nodes: [], edges: [] };
+  if (selected.length < 2) return EMPTY_GRAPH_PREVIEW;
 
   const selectedIndex = new Map(selected.map((id, index) => [id, index]));
   const edgeKeys = new Set<number>();
@@ -230,49 +266,63 @@ async function buildGraphPreview(
 
 export async function getDashboardData(): Promise<DashboardData> {
   await connection();
-  const articles = await prisma.article.findMany({
-    where: { source: "obsidian", url: { startsWith: JCG_URL_PREFIX } },
-    select: {
-      id: true,
-      title: true,
-      url: true,
-      content: true,
-      tags: true,
-      updatedAt: true,
-      createdAt: true,
-      _count: { select: { notes: true, highlights: true } },
-    },
-  });
+  const config = getVaultConfig();
+  // Vault 未配置/不可用时返回空数据，而不是让 listVaultFolders/resolveVaultPath 抛错导致整页 500
+  if (!config.configured || !config.available) {
+    return emptyDashboardData(config.vaultName || "Obsidian");
+  }
 
+  // 互不依赖的查询并行执行；正文不再整篇加载
+  const [articles, links, graphSource] = await Promise.all([
+    prisma.article.findMany({
+      where: { source: "obsidian", url: { startsWith: JCG_URL_PREFIX } },
+      select: {
+        id: true,
+        title: true,
+        url: true,
+        tags: true,
+        updatedAt: true,
+        createdAt: true,
+        _count: { select: { notes: true, highlights: true } },
+      },
+    }),
+    countJcgWikiLinks(),
+    loadGraphSource(),
+  ]);
+
+  // 文件夹统计走 obsidian-vault 的短 TTL 缓存（监听器变更时失效）
   const folders = listVaultFolders().filter(
     (folder) => folder.path.startsWith("JCG/") && folder.fileCount > 0,
   );
+  const fileTimes = await Promise.all(
+    articles.map((article) => getFileTimes(article, config.vaultPath)),
+  );
   const datedArticles = articles
-    .map((article) => ({ article, modifiedAt: getFileModifiedAt(article) }))
+    .map((article, index) => ({ article, ...fileTimes[index] }))
     .sort((left, right) => right.modifiedAt.getTime() - left.modifiedAt.getTime());
   const now = Date.now();
   const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
   const oneMonthAgo = now - 30 * 24 * 60 * 60 * 1000;
   const tagCount = new Set(articles.flatMap((article) => article.tags)).size;
-  const linkCounts = articles.map((article) => countWikiLinks(article.content));
 
   return {
-    vaultName: resolveVaultPath().vaultName || "Obsidian",
+    vaultName: config.vaultName || "Obsidian",
     articleCount: articles.length,
     folderCount: folders.length,
     tagCount,
-    linkCount: linkCounts.reduce((total, count) => total + count, 0),
+    linkCount: links.linkCount,
     annotationCount: articles.reduce(
       (total, article) => total + article._count.notes + article._count.highlights,
       0,
     ),
     updatedThisWeek: datedArticles.filter(({ modifiedAt }) => modifiedAt.getTime() >= oneWeekAgo).length,
-    linkedArticleCount: linkCounts.filter((count) => count > 0).length,
+    linkedArticleCount: links.linkedArticleCount,
     annotatedArticleCount: articles.filter(
       (article) => article._count.notes + article._count.highlights > 0,
     ).length,
     updatedThisMonth: datedArticles.filter(({ modifiedAt }) => modifiedAt.getTime() >= oneMonthAgo).length,
-    graphPreview: await buildGraphPreview(
+    graphPreview: buildGraphPreview(
+      graphSource,
       datedArticles.map(({ article, modifiedAt }) => ({ title: article.title, modifiedAt })),
       oneWeekAgo,
     ),
@@ -283,8 +333,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       updatedAt: modifiedAt.toISOString(),
     })),
     // 最近沉淀 = 新写进 vault 的文档（按文件出生时间），与“最近更新（按修改时间）”语义区分
-    fresh: articles
-      .map((article) => ({ article, bornAt: getFileBornAt(article) }))
+    fresh: [...datedArticles]
       .sort((a, b) => b.bornAt.getTime() - a.bornAt.getTime())
       .slice(0, 3)
       .map(({ article, bornAt }) => ({

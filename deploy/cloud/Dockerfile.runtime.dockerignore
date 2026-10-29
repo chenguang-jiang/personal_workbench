@@ -1,0 +1,8 @@
+.env
+.env.*
+.git
+output
+src
+docs
+assets
+*.tsbuildinfo

@@ -1,0 +1,15 @@
+# 用本机构建的 .next 和服务器安装的 Linux 依赖制作运行镜像。
+FROM node:24.11.1-bookworm-slim
+RUN sed -i 's|http://deb.debian.org/debian|http://mirrors.cloud.tencent.com/debian|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
+COPY --chown=node:node node_modules ./node_modules
+COPY --chown=node:node .next ./.next
+COPY --chown=node:node public ./public
+COPY --chown=node:node package.json next.config.ts prisma.config.ts ./
+COPY --chown=node:node prisma ./prisma
+RUN DATABASE_URL=postgresql://build:build@localhost:5432/build npx prisma generate
+USER node
+EXPOSE 3000
+CMD ["npm", "start"]

@@ -72,12 +72,13 @@ export function ArticleOutline({
           href={`#${item.id}`}
           data-level={item.level}
           aria-current={activeId === item.id ? "location" : undefined}
+          title={item.text}
           onClick={(event) => {
             event.preventDefault();
             onJump(item.id);
           }}
         >
-          {item.text}
+          <span className="reader-outline-text">{item.text}</span>
         </a>
       ))}
     </nav>
@@ -97,7 +98,13 @@ export function ReaderTuner({
 }) {
   return (
     <div className="reader-tuner">
-      <div className="reader-tuner-track" role="group" aria-label="阅读字体">
+      <div
+        className="reader-tuner-track reader-tuner-track--font"
+        role="group"
+        aria-label="阅读字体"
+        data-active={font}
+      >
+        <span className="reader-tuner-slider" aria-hidden="true" />
         <button
           type="button"
           aria-pressed={font === "sans"}
@@ -113,7 +120,13 @@ export function ReaderTuner({
           衬线
         </button>
       </div>
-      <div className="reader-tuner-track" role="group" aria-label="正文字号">
+      <div
+        className="reader-tuner-track reader-tuner-track--size"
+        role="group"
+        aria-label="正文字号"
+        data-active={size}
+      >
+        <span className="reader-tuner-slider" aria-hidden="true" />
         <button
           type="button"
           aria-pressed={size === "sm"}

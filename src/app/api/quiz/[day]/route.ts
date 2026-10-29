@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { computeNudge, gradeQuiz, listQuizDays, parseQuizSet } from "@/lib/quiz";
+import { computeNudge, gradeQuiz, listAllQuizSets, parseQuizSet } from "@/lib/quiz";
+import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 async function loadSet(day: string) {
-  const entry = listQuizDays().find((item) => item.day === day);
+  const entry = listAllQuizSets().find((item) => item.day === day);
   if (!entry) return null;
   return parseQuizSet(entry.file, day);
 }
@@ -13,13 +14,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ day
   const set = await loadSet(day);
   if (!set) return NextResponse.json({ error: "题集不存在" }, { status: 404 });
 
-  const state = await prisma.quizSetState.upsert({
-    where: { id: day },
-    create: { id: day },
-    update: {},
-  });
-  const answers = await prisma.quizAnswer.findMany({ where: { setId: day } });
-  const wrongRows = await prisma.quizWrong.findMany({ where: { setId: day } });
+  const [state, answers, wrongRows] = await Promise.all([
+    prisma.quizSetState.upsert({ where: { id: day }, create: { id: day }, update: {} }),
+    prisma.quizAnswer.findMany({ where: { setId: day } }),
+    prisma.quizWrong.findMany({ where: { setId: day } }),
+  ]);
   const nudge = computeNudge(day, state.status, state.reminderStage);
   return NextResponse.json({
     set,
@@ -32,7 +31,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ day
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ day: string }> }) {
   const { day } = await params;
-  const body = await req.json();
+  const body = await readJsonObject<{
+    action?: string;
+    qIndex?: unknown;
+    mine?: unknown;
+    choice?: unknown;
+    on?: boolean;
+    status?: string;
+  }>(req);
+  if (!body) return invalidJsonResponse();
   const set = await loadSet(day);
   if (!set) return NextResponse.json({ error: "题集不存在" }, { status: 404 });
 
@@ -53,8 +60,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ day
         create: { setId: day, qIndex: question.index, choice: "SELF", correct: true },
         update: { choice: "SELF", correct: true },
       });
-      const answers = await prisma.quizAnswer.findMany({ where: { setId: day } });
-      const current = await prisma.quizSetState.findUnique({ where: { id: day } });
+      const [answers, current] = await Promise.all([
+        prisma.quizAnswer.findMany({ where: { setId: day } }),
+        prisma.quizSetState.findUnique({ where: { id: day } }),
+      ]);
       const state = await prisma.quizSetState.upsert({
         where: { id: day },
         create: { id: day, status: "doing" },
@@ -83,18 +92,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ day
       update: { choice, correct },
     });
 
-    const all = await prisma.quizAnswer.findMany({ where: { setId: day } });
+    const [answers, current] = await Promise.all([
+      prisma.quizAnswer.findMany({ where: { setId: day } }),
+      prisma.quizSetState.findUnique({ where: { id: day } }),
+    ]);
     const allCorrect = set.questions.every((item) =>
-      all.some((answer) => answer.qIndex === item.index && answer.correct),
+      answers.some((answer) => answer.qIndex === item.index && answer.correct),
     );
-    const current = await prisma.quizSetState.findUnique({ where: { id: day } });
     const nextStatus = allCorrect ? "done" : current?.status === "pending" ? "doing" : current?.status ?? "doing";
     const state = await prisma.quizSetState.upsert({
       where: { id: day },
       create: { id: day, status: nextStatus, completedAt: allCorrect ? new Date() : null },
       update: { status: nextStatus, completedAt: allCorrect ? new Date() : current?.completedAt ?? null },
     });
-    const answers = await prisma.quizAnswer.findMany({ where: { setId: day } });
     const nudge = computeNudge(day, state.status, state.reminderStage);
     return NextResponse.json({ state, answers, nudge });
   }

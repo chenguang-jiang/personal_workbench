@@ -106,6 +106,22 @@ export async function reindexKnowledge() {
   return { articles: articles.length, chunks: chunkCount };
 }
 
+/** 导入后只更新当前文档的检索片段，避免为每次上传重建整个知识库。 */
+export async function reindexArticleKnowledge(articleId: string) {
+  const article = await prisma.article.findUnique({ where: { id: articleId }, select: { id: true, title: true, url: true, content: true, tags: true } });
+  if (!article) throw new Error("文档不存在");
+  const chunks = splitIntoChunks(article.content?.trim() || "");
+  await prisma.$transaction([
+    prisma.knowledgeChunk.deleteMany({ where: { articleId } }),
+    ...chunks.map((chunk, chunkIndex) => prisma.knowledgeChunk.create({ data: {
+      articleId, title: article.title, vaultPath: article.url?.startsWith("obsidian://") ? article.url.slice("obsidian://".length) : null,
+      chunkIndex, content: chunk.content, startOffset: chunk.startOffset, endOffset: chunk.endOffset,
+      contentHash: createHash("sha256").update(chunk.content).digest("hex"), tags: article.tags,
+    } })),
+  ]);
+  return chunks.length;
+}
+
 function tokensOf(input: string): string[] {
   const normalized = input.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ");
   const words = normalized.split(/\s+/).filter((token) => token.length > 1);
@@ -142,6 +158,8 @@ export async function searchKnowledgeChunks(
       tags: true,
       article: { select: { url: true } },
     },
+    // 超过上限时固定取最近更新的片段，保证检索子集稳定可复现
+    orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
     take: 8000,
   });
   if (chunks.length === 0) {
@@ -158,6 +176,8 @@ export async function searchKnowledgeChunks(
         tags: true,
         article: { select: { url: true } },
       },
+      // 超过上限时固定取最近更新的片段，保证检索子集稳定可复现
+      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
       take: 8000,
     });
   }

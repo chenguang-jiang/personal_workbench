@@ -1,0 +1,964 @@
+.reader-notes,
+.ai-assistant {
+  display: flex;
+  width: 318px;
+  min-width: 280px;
+  flex-direction: column;
+  border-left: 1px solid var(--color-border);
+  background: color-mix(
+    in oklab,
+    var(--color-surface) 95%,
+    var(--color-elevated)
+  );
+  animation: panel-in 210ms var(--ease-out-expo) both;
+}
+
+.reader-notes {
+  overflow-y: auto;
+  padding: 0 16px 18px;
+}
+
+.reader-panel-header {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reader-panel-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.reader-panel-header h2 svg {
+  width: 15px;
+  color: var(--color-accent-purple);
+}
+
+.reader-panel-close {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-tertiary);
+  cursor: pointer;
+}
+
+.reader-panel-close:hover {
+  background: var(--color-elevated);
+  color: var(--color-primary);
+}
+
+.reader-panel-close svg {
+  width: 14px;
+}
+
+.reader-note-list {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+}
+
+.reader-panel-empty {
+  margin: 22px 0;
+  color: var(--color-tertiary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.saved-highlight {
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+  padding: 11px;
+}
+
+.saved-highlight-quote {
+  margin: 0;
+  border-radius: 6px;
+  padding: 8px;
+  color: var(--color-primary);
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.65;
+}
+
+.saved-highlight-note {
+  margin: 9px 0 0;
+  color: var(--color-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.reader-note-composer {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  border: 1px solid
+    color-mix(in oklab, var(--color-accent-purple) 32%, var(--color-border));
+  border-radius: 10px;
+  background: var(--color-accent-lilac);
+  padding: 12px;
+}
+
+.reader-selected-quote {
+  margin: 0;
+  color: var(--color-secondary);
+  font-family: var(--font-serif);
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.65;
+}
+
+.reader-note-composer .button {
+  width: 100%;
+}
+
+.ai-assistant {
+  padding: 0 14px 14px;
+}
+
+.ai-selection {
+  border-bottom: 1px solid var(--color-border);
+  padding: 14px 0;
+}
+
+.ai-selection > p:last-child {
+  margin: 0;
+  border-radius: 8px;
+  background: var(--color-accent-lilac);
+  padding: 10px;
+  color: var(--color-secondary);
+  font-family: var(--font-serif);
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.7;
+}
+
+.ai-messages {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  align-content: start;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 14px 0;
+}
+
+.ai-empty {
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-tertiary);
+  text-align: center;
+}
+
+.ai-empty svg {
+  width: 26px;
+  color: var(--color-accent-purple);
+  opacity: 0.45;
+}
+
+.ai-empty p {
+  max-width: 24ch;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ai-message {
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+  padding: 11px;
+  color: var(--color-primary);
+  font-size: 11px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.ai-message--user {
+  border-color: transparent;
+  background: var(--color-accent-lilac);
+  color: var(--color-accent-purple-dark);
+}
+
+.ai-streaming::after {
+  display: inline-block;
+  width: 6px;
+  height: 12px;
+  margin-left: 3px;
+  background: var(--color-accent-purple);
+  content: "";
+  animation: cursor-blink 800ms steps(1) infinite;
+  vertical-align: -1px;
+}
+
+.ai-composer {
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+
+.ai-composer form {
+  display: flex;
+  gap: 7px;
+}
+
+.ai-send {
+  flex: none;
+  border-color: var(--color-accent-purple);
+  background: var(--color-accent-purple);
+  color: white;
+}
+
+.ai-spinner {
+  animation: spin 800ms linear infinite;
+}
+
+.button-ink {
+  border-color: #17131f;
+  background: #17131f;
+  color: #fff;
+}
+
+.button-ink:hover {
+  border-color: var(--color-accent-purple-dark);
+  background: var(--color-accent-purple-dark);
+}
+
+.annotation-desk {
+  display: flex;
+  width: 372px;
+  min-width: 320px;
+  flex-direction: column;
+  border-left: 1px solid var(--color-border-strong);
+  background: color-mix(
+    in oklab,
+    var(--color-surface) 97%,
+    var(--color-accent-lilac)
+  );
+  box-shadow: -18px 0 46px
+    color-mix(in oklab, var(--color-primary) 7%, transparent);
+  animation: panel-in 240ms var(--ease-out-expo) both;
+}
+
+.annotation-desk-head {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+}
+
+.annotation-desk-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.annotation-desk-head p {
+  margin: 0;
+}
+
+.annotation-desk-head strong {
+  font-family: var(--font-serif);
+  font-size: 15px;
+}
+
+.annotation-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.annotation-tabs button {
+  position: relative;
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--color-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.annotation-tabs button::after {
+  position: absolute;
+  right: 18%;
+  bottom: -1px;
+  left: 18%;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: transparent;
+  content: "";
+  transition:
+    inset 180ms var(--ease-out-expo),
+    background-color 180ms ease;
+}
+
+.annotation-tabs button:hover,
+.annotation-tabs button.active {
+  color: var(--color-accent-purple-dark);
+}
+
+.annotation-tabs button.active {
+  font-weight: 700;
+}
+
+.annotation-tabs button.active::after {
+  right: 0;
+  left: 0;
+  background: var(--color-accent-purple);
+}
+
+.annotation-tabs svg {
+  width: 13px;
+}
+
+.annotation-tabs small {
+  display: inline-grid;
+  min-width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-accent-lilac);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.annotation-body {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 16px 24px;
+}
+
+.annotation-section {
+  display: grid;
+  align-content: start;
+  gap: 13px;
+}
+
+.annotation-section-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.annotation-section-title p,
+.annotation-section-title h2 {
+  margin: 0;
+}
+
+.annotation-section-title h2 {
+  margin-top: 4px;
+  font-family: var(--font-serif);
+  font-size: 20px;
+}
+
+.annotation-section-title > svg {
+  width: 20px;
+  color: var(--color-accent-purple);
+}
+
+.annotation-agent-context {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid
+    color-mix(in oklab, var(--color-accent-purple) 24%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: var(--color-accent-lilac);
+}
+
+.annotation-agent-context > svg {
+  width: 18px;
+  flex: none;
+  color: var(--color-accent-purple);
+}
+
+.annotation-agent-context span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.annotation-agent-context strong {
+  font-size: 12px;
+}
+
+.annotation-agent-context small,
+.annotation-agent-hint {
+  color: var(--color-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.annotation-agent .annotation-quick-questions button.is-active {
+  border-color: color-mix(
+    in oklab,
+    var(--color-accent-purple) 46%,
+    var(--color-border)
+  );
+  color: var(--color-accent-purple-dark);
+  background: var(--color-accent-lilac);
+}
+
+.annotation-agent .ai-composer-actions {
+  align-items: center;
+}
+
+.annotation-agent .ai-composer-actions .button {
+  white-space: nowrap;
+}
+
+.annotation-quote-card {
+  border: 1px solid var(--color-border-strong);
+  border-left: 3px solid var(--color-accent-purple);
+  border-radius: 3px 9px 9px 3px;
+  background: var(--color-surface);
+  padding: 11px 12px;
+}
+
+.annotation-quote-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.annotation-quote-card > div span {
+  color: var(--color-accent-purple-dark);
+  font-size: 11.5px;
+}
+
+.annotation-quote-card p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 12px 0 0;
+  color: var(--color-secondary);
+  font-family: var(--font-serif);
+  font-size: 12px;
+  line-height: 1.75;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 7;
+}
+
+.annotation-textarea {
+  min-height: 112px;
+  resize: vertical;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.annotation-textarea:focus {
+  border-color: var(--color-accent-purple);
+  box-shadow: 0 0 0 3px
+    color-mix(in oklab, var(--color-accent-purple) 10%, transparent);
+}
+
+.annotation-primary {
+  width: 100%;
+}
+
+.annotation-saved {
+  display: grid;
+  gap: 9px;
+  margin-top: 6px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 14px;
+}
+
+.annotation-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-tertiary);
+  font-size: 11.5px;
+}
+
+.annotation-list-heading strong {
+  color: var(--color-accent-purple-dark);
+  font-family: var(--font-mono);
+}
+
+.annotation-note {
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+  padding: 11px;
+  color: var(--color-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.annotation-context-card,
+.annotation-success {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid
+    color-mix(in oklab, var(--color-accent-purple) 24%, var(--color-border));
+  border-radius: 9px;
+  background: var(--color-accent-lilac);
+  padding: 11px;
+  color: var(--color-accent-purple-dark);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.annotation-context-card svg,
+.annotation-success svg {
+  width: 17px;
+  flex: none;
+}
+
+.annotation-field {
+  display: grid;
+  gap: 7px;
+}
+
+.annotation-field > span {
+  color: var(--color-secondary);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.annotation-quick-questions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.annotation-quick-questions button {
+  min-height: 27px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  padding: 0 9px;
+  color: var(--color-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.annotation-quick-questions button:hover {
+  border-color: var(--color-accent-purple);
+  color: var(--color-accent-purple-dark);
+}
+
+.annotation-answer {
+  display: grid;
+  gap: 10px;
+  border-top: 2px solid var(--color-primary);
+  background: var(--color-surface);
+  padding: 14px 12px;
+}
+
+.annotation-answer > p {
+  margin: 0;
+}
+
+.annotation-answer > div {
+  color: var(--color-primary);
+  font-family: var(--font-serif);
+  font-size: 12px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.annotation-answer .button {
+  justify-self: start;
+}
+
+.annotation-help {
+  margin: 0;
+  color: var(--color-tertiary);
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+
+.annotation-folder-select {
+  position: relative;
+}
+
+.annotation-folder-select > svg {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  z-index: 1;
+  width: 13px;
+  color: var(--color-accent-purple);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.annotation-folder-select .select {
+  width: 100%;
+  padding-left: 33px;
+}
+
+.annotation-package {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.annotation-package > .micro-label {
+  margin: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-elevated);
+  padding: 9px 11px;
+}
+
+.annotation-check-row {
+  display: grid;
+  min-height: 48px;
+  grid-template-columns: 16px 1fr;
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 7px 11px;
+  cursor: pointer;
+}
+
+.annotation-check-row input {
+  accent-color: var(--color-accent-purple);
+}
+
+.annotation-check-row span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.annotation-check-row strong {
+  font-size: 11.5px;
+}
+
+.annotation-check-row small {
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.annotation-package-selected {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 11px;
+  color: var(--color-accent-purple-dark);
+  font-size: 11px;
+}
+
+.annotation-package-selected svg {
+  width: 12px;
+}
+
+.annotation-success {
+  border-color: color-mix(
+    in oklab,
+    var(--color-accent-green) 40%,
+    var(--color-border)
+  );
+  background: color-mix(
+    in oklab,
+    var(--color-accent-green) 9%,
+    var(--color-surface)
+  );
+  color: var(--color-primary);
+}
+
+.annotation-success span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.annotation-success small {
+  overflow: hidden;
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-notice,
+.annotation-error {
+  margin: 13px 0 0;
+  border-radius: 7px;
+  background: var(--color-elevated);
+  padding: 9px 10px;
+  color: var(--color-secondary);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.annotation-error {
+  margin: 0;
+  color: var(--color-accent-rose);
+}
+
+.selection-toolbar {
+  position: fixed;
+  z-index: var(--z-dialog);
+  display: flex;
+  gap: 3px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 9px;
+  background: var(--color-surface);
+  padding: 4px;
+  box-shadow: 0 14px 34px
+    color-mix(in oklab, var(--color-primary) 18%, transparent);
+  animation: dialog-in 160ms var(--ease-out-expo) both;
+}
+
+.selection-action,
+.selection-cancel {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0 8px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.selection-action:hover,
+.selection-cancel:hover {
+  background: var(--color-elevated);
+}
+
+.selection-action svg {
+  width: 13px;
+}
+
+.bs-ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.highlight-color {
+  width: 29px;
+  height: 29px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
+
+.highlight-color:hover {
+  transform: scale(1.08);
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes cursor-blink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+  49%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- AI 对话面板补齐（组件：ReaderAiChat） ---------- */
+
+/* 回答用 mini-markdown 渲染，字号比用户气泡略大、行距放宽 */
+.ai-message--assistant {
+  color: color-mix(in oklab, var(--color-primary) 88%, var(--color-secondary));
+  font-size: 12.5px;
+}
+
+.ai-message--assistant .mini-markdown {
+  line-height: 1.7;
+}
+
+.ai-message--assistant .mini-markdown :last-child {
+  margin-bottom: 0;
+}
+
+.ai-placeholder {
+  color: var(--color-tertiary);
+}
+
+.ai-error {
+  margin: 8px 0 0;
+  color: var(--color-danger);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+/* 问答 / 修改文章 模式切换 */
+.ai-mode-toggle {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-elevated);
+  padding: 3px;
+  width: fit-content;
+}
+
+.ai-mode-toggle button {
+  min-height: 26px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  padding: 3px 10px;
+  color: var(--color-tertiary);
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ai-mode-toggle button.is-active {
+  color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.ai-input {
+  min-height: 52px;
+  max-height: 140px;
+  resize: none;
+  font-size: 12px;
+}
+
+/* AI 修改稿预览卡：先预览再应用，应用走 PATCH 并进入可撤销快照 */
+.ai-edit-card {
+  overflow: hidden;
+  border: 1px solid
+    color-mix(in oklab, var(--color-accent-purple) 34%, var(--color-border));
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.ai-edit-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-elevated);
+  padding: 7px 10px;
+}
+
+.ai-edit-card-head > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-accent-purple-dark);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.ai-edit-card-head svg {
+  width: 13px;
+}
+
+.ai-edit-card-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.ai-edit-discard,
+.ai-edit-apply {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  padding: 0 9px;
+  color: var(--color-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.ai-edit-discard:hover {
+  color: var(--color-primary);
+  background: var(--color-hover);
+}
+
+.ai-edit-apply {
+  border-color: var(--color-accent-purple);
+  background: var(--color-accent-purple);
+  color: #fff;
+}
+
+.ai-edit-apply:hover {
+  border-color: var(--color-accent-purple-dark);
+  background: var(--color-accent-purple-dark);
+}
+
+.ai-edit-apply:disabled,
+.ai-edit-discard:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ai-edit-card pre {
+  max-height: 260px;
+  margin: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.65;
+  scrollbar-width: thin;
+}

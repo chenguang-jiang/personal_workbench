@@ -18,6 +18,7 @@ export type FileSyncResult = {
   status: "created" | "updated" | "unchanged" | "skipped";
   title: string;
   relativePath: string;
+  titleChanged?: boolean;
 };
 
 export type VaultSyncSummary = {
@@ -31,8 +32,13 @@ export type VaultSyncSummary = {
   relations?: { created: number; removed: number };
 };
 
+// 只读环境变量，不触碰文件系统；高频路径（遍历过滤、监听器 ignored 回调）用它代替 getVaultConfig
+function getVaultRoot() {
+  return process.env.OBSIDIAN_VAULT_PATH?.trim() || "";
+}
+
 export function getVaultConfig() {
-  const vaultPath = process.env.OBSIDIAN_VAULT_PATH?.trim() || "";
+  const vaultPath = getVaultRoot();
   return {
     vaultPath,
     vaultName: vaultPath ? path.basename(vaultPath) : "",
@@ -42,7 +48,7 @@ export function getVaultConfig() {
 }
 
 export function isIgnoredVaultPath(candidatePath: string) {
-  const { vaultPath } = getVaultConfig();
+  const vaultPath = getVaultRoot();
   if (!vaultPath) return true;
   const relativePath = path.relative(vaultPath, candidatePath);
   if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) return true;
@@ -60,7 +66,7 @@ async function getDefaultUserId() {
 }
 
 function normalizeTags(filePath: string, frontmatterTags: unknown) {
-  const { vaultPath } = getVaultConfig();
+  const vaultPath = getVaultRoot();
   const relativePath = path.relative(vaultPath, filePath);
   const directoryTags = relativePath
     .split(path.sep)
@@ -75,7 +81,7 @@ function normalizeTags(filePath: string, frontmatterTags: unknown) {
 
 function inferType(filePath: string, frontmatter: Record<string, unknown>) {
   if (frontmatter.type) return String(frontmatter.type);
-  const relativePath = path.relative(getVaultConfig().vaultPath, filePath).toLowerCase();
+  const relativePath = path.relative(getVaultRoot(), filePath).toLowerCase();
   if (relativePath.includes("concept") || relativePath.includes("02-concepts")) return "concept";
   if (relativePath.includes("clipping") || relativePath.includes("article")) return "article";
   if (relativePath.includes("tool") || relativePath.includes("工具")) return "material";
@@ -126,13 +132,14 @@ export function extractMarkdownFileTargets(content: string): string[] {
   return [...targets];
 }
 
-// 根据正文 wikilink 重建 KnowledgeRelation（type=references），只增删 references 类型，不碰其他类型
-export async function rebuildKnowledgeRelations(): Promise<{ created: number; removed: number }> {
-  const userId = await getDefaultUserId();
+type RelationResolver = (content: string, sourceId: string) => Map<string, { fromId: string; toId: string }>;
+
+// 载入全部节点标题 + Obsidian 文章路径（不含正文），构造 wikilink / Markdown 链接解析器
+async function buildRelationResolver(userId: string): Promise<RelationResolver> {
   const [nodes, obsidianArticles] = await Promise.all([
     prisma.knowledgeNode.findMany({
       where: { userId },
-      select: { id: true, title: true, content: true },
+      select: { id: true, title: true },
     }),
     prisma.article.findMany({
       where: { userId, source: "obsidian" },
@@ -195,8 +202,8 @@ export async function rebuildKnowledgeRelations(): Promise<{ created: number; re
     return null;
   }
 
+  const vaultPath = getVaultRoot();
   function resolveMarkdownTarget(rawTarget: string, sourceId: string): string | null {
-    const { vaultPath } = getVaultConfig();
     let target = rawTarget;
     if (vaultPath && target.startsWith(vaultPath)) {
       target = target.slice(vaultPath.length).replace(/^\//, "");
@@ -224,24 +231,26 @@ export async function rebuildKnowledgeRelations(): Promise<{ created: number; re
     return candidates && candidates.length === 1 ? candidates[0] : null;
   }
 
-  const desired = new Map<string, { fromId: string; toId: string }>();
-  for (const node of nodes) {
-    if (!node.content) continue;
+  return (content, sourceId) => {
+    const desired = new Map<string, { fromId: string; toId: string }>();
     const targets = [
-      ...extractWikilinkTargets(node.content).map((target) => ({ kind: "wiki" as const, target })),
-      ...extractMarkdownFileTargets(node.content).map((target) => ({ kind: "md" as const, target })),
+      ...extractWikilinkTargets(content).map((target) => ({ kind: "wiki" as const, target })),
+      ...extractMarkdownFileTargets(content).map((target) => ({ kind: "md" as const, target })),
     ];
     for (const { kind, target } of targets) {
-      const resolved = kind === "wiki" ? resolveTarget(target, node.id) : resolveMarkdownTarget(target, node.id);
-      if (!resolved || resolved === node.id) continue;
-      desired.set(`${node.id}::${resolved}`, { fromId: node.id, toId: resolved });
+      const resolved = kind === "wiki" ? resolveTarget(target, sourceId) : resolveMarkdownTarget(target, sourceId);
+      if (!resolved || resolved === sourceId) continue;
+      desired.set(`${sourceId}::${resolved}`, { fromId: sourceId, toId: resolved });
     }
-  }
+    return desired;
+  };
+}
 
-  const existing = await prisma.knowledgeRelation.findMany({
-    where: { type: "references" },
-    select: { id: true, fromId: true, toId: true },
-  });
+// 按期望集合与现有 references 边做增删（只动 references 类型）
+async function applyReferenceDiff(
+  existing: Array<{ id: string; fromId: string; toId: string }>,
+  desired: Map<string, { fromId: string; toId: string }>,
+) {
   const desiredKeys = new Set(desired.keys());
   const toDelete = existing
     .filter((relation) => !desiredKeys.has(`${relation.fromId}::${relation.toId}`))
@@ -257,13 +266,56 @@ export async function rebuildKnowledgeRelations(): Promise<{ created: number; re
   if (toCreate.length > 0) {
     await prisma.knowledgeRelation.createMany({ data: toCreate, skipDuplicates: true });
   }
-  console.log(`[ObsidianSync] 关系重建：${toCreate.length} 新增 · ${toDelete.length} 移除`);
   return { created: toCreate.length, removed: toDelete.length };
+}
+
+// 根据正文 wikilink 重建 KnowledgeRelation（type=references），只增删 references 类型，不碰其他类型
+export async function rebuildKnowledgeRelations(): Promise<{ created: number; removed: number }> {
+  const userId = await getDefaultUserId();
+  const [resolve, nodes] = await Promise.all([
+    buildRelationResolver(userId),
+    prisma.knowledgeNode.findMany({
+      where: { userId },
+      select: { id: true, content: true },
+    }),
+  ]);
+
+  const desired = new Map<string, { fromId: string; toId: string }>();
+  for (const node of nodes) {
+    if (!node.content) continue;
+    for (const [key, pair] of resolve(node.content, node.id)) desired.set(key, pair);
+  }
+
+  const existing = await prisma.knowledgeRelation.findMany({
+    where: { type: "references" },
+    select: { id: true, fromId: true, toId: true },
+  });
+  const result = await applyReferenceDiff(existing, desired);
+  console.log(`[ObsidianSync] 关系重建：${result.created} 新增 · ${result.removed} 移除`);
+  return result;
+}
+
+// 单文件保存时只重算该节点的出边（不加载其他节点正文）；入边由新增/删除/改名时的完整重建负责
+export async function rebuildNodeOutgoingRelations(
+  nodeId: string,
+  content: string | null,
+): Promise<{ created: number; removed: number }> {
+  const userId = await getDefaultUserId();
+  const [resolve, existing] = await Promise.all([
+    buildRelationResolver(userId),
+    prisma.knowledgeRelation.findMany({
+      where: { type: "references", fromId: nodeId },
+      select: { id: true, fromId: true, toId: true },
+    }),
+  ]);
+  const desired = content ? resolve(content, nodeId) : new Map<string, { fromId: string; toId: string }>();
+  return applyReferenceDiff(existing, desired);
 }
 
 export async function syncObsidianFile(
   filePath: string,
-  options: { rebuildRelations?: boolean } = {},
+  // rebuildRelations=false 跳过关系维护；relationScope="node" 只更新本文件出边（监听器保存场景）
+  options: { rebuildRelations?: boolean; relationScope?: "full" | "node" } = {},
 ): Promise<FileSyncResult> {
   const config = getVaultConfig();
   const relativePath = config.vaultPath ? path.relative(config.vaultPath, filePath) : "";
@@ -316,7 +368,9 @@ export async function syncObsidianFile(
     },
   });
 
+  let nodeId: string;
   if (existingNode) {
+    nodeId = existingNode.id;
     if (
       existingNode.title !== article.title ||
       existingNode.content !== article.content ||
@@ -330,17 +384,25 @@ export async function syncObsidianFile(
       });
     }
   } else {
-    await prisma.knowledgeNode.create({
+    const createdNode = await prisma.knowledgeNode.create({
       data: { title: article.title, content: article.content, description, type, tags, userId },
+      select: { id: true },
     });
+    nodeId = createdNode.id;
   }
 
   const status = existing ? (changed ? "updated" : "unchanged") : "created";
+  // 标题变化/新建会影响其他文件指向本节点的入边：node 模式下只更新出边，由调用方（监听器）安排完整重建
+  const titleChanged = Boolean(existing && existing.title !== title);
   if (options.rebuildRelations !== false && status !== "unchanged") {
-    await rebuildKnowledgeRelations();
+    if (options.relationScope === "node") {
+      await rebuildNodeOutgoingRelations(nodeId, article.content);
+    } else {
+      await rebuildKnowledgeRelations();
+    }
   }
 
-  return { status, title, relativePath };
+  return { status, title, relativePath, titleChanged };
 }
 
 export async function deleteObsidianFile(filePath: string) {
@@ -359,6 +421,67 @@ export async function deleteObsidianFile(filePath: string) {
     }),
   ]);
   return true;
+}
+
+/**
+ * 把 Vault 内的 Markdown 文件移动到新位置，并保住 Article id。
+ *
+ * 必须 DB 先行：chokidar 会把 rename 看成 unlink + add，如果先动文件，
+ * unlink 触发 deleteObsidianFile 按旧 url 删掉文章，add 再按新 url 建一条
+ * 新记录 —— 新 id，标注/笔记/检索分片全部丢失。反过来先把 url 改成新路径，
+ * watcher 收到 unlink 时旧 url 已查不到文章（无害），收到 add 时新 url 命中
+ * 同一条记录且内容未变（unchanged），id 与关联数据原地不动。
+ */
+export async function relocateObsidianFile(oldAbs: string, newAbs: string) {
+  const config = getVaultConfig();
+  if (!config.available || !config.vaultPath) throw new Error("Obsidian Vault 不可用");
+  if (!oldAbs.endsWith(".md") || !newAbs.endsWith(".md")) throw new Error("只能移动 Markdown 文件");
+  if (isIgnoredVaultPath(oldAbs)) throw new Error("源文件在被忽略的路径中");
+  if (isIgnoredVaultPath(newAbs)) throw new Error("目标位置在被忽略的路径中");
+  const vaultReal = fs.realpathSync(/* turbopackIgnore: true */ config.vaultPath);
+  for (const candidate of [oldAbs, newAbs]) {
+    const inside = path.relative(vaultReal, fs.realpathSync(path.dirname(candidate)));
+    if (inside.startsWith("..") || path.isAbsolute(inside)) throw new Error("路径超出 Obsidian Vault");
+  }
+  if (!fs.existsSync(oldAbs)) throw new Error("源文件不存在");
+  if (fs.existsSync(newAbs)) throw new Error("目标位置已存在同名文件");
+
+  const toRel = (abs: string) => path.relative(config.vaultPath!, abs).split(path.sep).join("/");
+  const oldRel = toRel(oldAbs);
+  const newRel = toRel(newAbs);
+  const userId = await getDefaultUserId();
+  const oldUrl = `obsidian://${oldRel}`;
+  const newUrl = `obsidian://${newRel}`;
+  const article = await prisma.article.findUnique({ where: { userId_url: { userId, url: oldUrl } } });
+  const occupant = await prisma.article.findUnique({
+    where: { userId_url: { userId, url: newUrl } },
+    select: { id: true },
+  });
+  if (occupant && occupant.id !== article?.id) {
+    throw new Error("目标路径已有另一篇文章的记录，请换个位置");
+  }
+
+  const relink = () =>
+    prisma.$transaction([
+      prisma.article.update({ where: { id: article!.id }, data: { url: newUrl } }),
+      prisma.knowledgeChunk.updateMany({ where: { articleId: article!.id }, data: { vaultPath: newRel } }),
+    ]);
+  if (article) await relink();
+
+  try {
+    fs.mkdirSync(path.dirname(newAbs), { recursive: true });
+    fs.renameSync(oldAbs, newAbs);
+  } catch (error) {
+    // 文件没动成，把数据库改回去，避免 url 指向不存在的路径
+    if (article) {
+      await prisma.$transaction([
+        prisma.article.update({ where: { id: article.id }, data: { url: oldUrl } }),
+        prisma.knowledgeChunk.updateMany({ where: { articleId: article.id }, data: { vaultPath: oldRel } }),
+      ]);
+    }
+    throw error;
+  }
+  return { articleId: article?.id ?? null, oldRel, newRel };
 }
 
 function scanMarkdownFiles(directory: string, base = directory): string[] {

@@ -11,7 +11,7 @@ import {
   type KnowledgeCitation,
 } from "@/lib/knowledge-grounding";
 import { syncObsidianFile } from "@/lib/obsidian-sync";
-import { resolveWorkbenchVaultPath } from "@/lib/vault-folders";
+import { uniqueWorkbenchVaultPath } from "@/lib/unique-vault-path";
 import { extractUrlMap, matchQueryToUrls, fetchExternalUrl } from "@/lib/fetch-external-url";
 
 export const dynamic = "force-dynamic";
@@ -31,9 +31,23 @@ function safeFileName(value: string) {
   return value.replace(/[\\/:*?"<>|#^\[\]]/g, " ").replace(/\s+/g, " ").trim().slice(0, 72);
 }
 
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+// 兜底：任何未预期异常都返回 JSON，避免客户端在 response.json() 处因 HTML 500 崩溃
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  try {
+    return await handlePost(req, ctx);
+  } catch (error) {
+    console.error("[knowledge-message] 请求处理失败", error);
+    return NextResponse.json({ error: errorMessage(error, "知识库问答暂时不可用") }, { status: 502 });
+  }
+}
+
+async function handlePost(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const body = (await req.json()) as {
+  const body = (await req.json().catch(() => ({}))) as {
     action?: "message" | "save-note" | "proposition" | "to-reasoning";
     content?: string;
     assistantContent?: string;
@@ -52,18 +66,27 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const date = new Date().toISOString().slice(0, 10);
     const title = safeFileName(session.question) || "知识库问答";
     const relativePath = `DawnKB/知识库问答/${date}-${title}.md`;
-    const resolved = resolveWorkbenchVaultPath(relativePath);
-    fs.mkdirSync(path.dirname(resolved.absolutePath), { recursive: true });
     const citations = asCitations(session.citations)
       .slice(-12)
       .map((item) => `- [[${item.path.replace(/\.md$/i, "")}]]：${item.quote.slice(0, 120).replace(/\s+/g, " ")}`)
       .join("\n");
-    fs.writeFileSync(
-      resolved.absolutePath,
-      `---\ntitle: "${title.replaceAll('"', '\\"')}"\ntags: [DawnKB, 知识库问答]\ncreated: ${date}\n---\n\n# ${session.question}\n\n${answer}\n\n## 来源\n\n${citations || "- 本次回答没有引用来源"}\n`,
-      "utf8",
-    );
-    await syncObsidianFile(resolved.absolutePath);
+    let resolved: { absolutePath: string; relativePath: string };
+    try {
+      // 同一天同一问题多次保存时追加 -2、-3…，并用 wx 防止覆盖已有笔记
+      resolved = uniqueWorkbenchVaultPath(relativePath);
+      fs.mkdirSync(path.dirname(resolved.absolutePath), { recursive: true });
+      fs.writeFileSync(
+        resolved.absolutePath,
+        `---\ntitle: "${title.replaceAll('"', '\\"')}"\ntags: [DawnKB, 知识库问答]\ncreated: ${date}\n---\n\n# ${session.question}\n\n${answer}\n\n## 来源\n\n${citations || "- 本次回答没有引用来源"}\n`,
+        { encoding: "utf8", flag: "wx" },
+      );
+    } catch (error) {
+      console.error("[knowledge-message] 保存笔记失败", { sessionId: id, error });
+      return NextResponse.json({ error: errorMessage(error, "保存到知识库失败") }, { status: 503 });
+    }
+    await syncObsidianFile(resolved.absolutePath).catch((error) => {
+      console.error("[knowledge-message] 同步笔记失败", { path: resolved.absolutePath, error });
+    });
     await prisma.brainstormSession.update({
       where: { id },
       data: {
@@ -154,10 +177,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const urlMap = extractUrlMap(allContent);
   const matchedUrls = matchQueryToUrls(`${session.question} ${content}`, urlMap);
   if (matchedUrls.length > 0) {
+    // 外部抓取是增强能力：单个地址失败只记录日志，不影响知识库回答
     const fetchResults = await Promise.all(
       matchedUrls.map(async ([label, url]) => {
-        const result = await fetchExternalUrl(url);
-        return { label, ...result };
+        try {
+          const result = await fetchExternalUrl(url);
+          return { label, ...result };
+        } catch (error) {
+          console.error("[knowledge-message] 外部文档抓取失败", { url, error });
+          return { label, url, content: undefined as string | undefined };
+        }
       }),
     );
     const fetched = fetchResults.filter((r) => r.content);
@@ -203,11 +232,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     ]
       .filter(Boolean)
       .join("\n\n");
-    answer = await chatOnce({
-      system: sysPrompt,
-      messages: history.slice(-8),
-      maxTokens: 1800,
-    });
+    try {
+      answer = await chatOnce({
+        system: sysPrompt,
+        messages: history.slice(-8),
+        maxTokens: 1800,
+      });
+    } catch (error) {
+      console.error("[knowledge-message] AI 回答失败", { sessionId: id, error });
+      return NextResponse.json({ error: errorMessage(error, "AI 后端不可用，请稍后重试") }, { status: 503 });
+    }
     answer = answer.trim() || "知识库中没有足够证据。";
   }
 

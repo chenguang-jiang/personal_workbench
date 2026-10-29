@@ -1,0 +1,385 @@
+/* ── AI 导入：对话式归档 ── */
+.ai-import-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.ai-import-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 480px;
+  max-height: calc(100vh - 260px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.ai-import-thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 26px 28px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ai-import-start {
+  margin: auto;
+  max-width: 460px;
+  text-align: center;
+  color: var(--color-secondary);
+}
+
+.ai-import-start svg {
+  width: 30px;
+  height: 30px;
+  color: var(--color-accent-purple);
+  margin: 0 auto 12px;
+}
+
+.ai-import-start h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-primary);
+  letter-spacing: -0.02em;
+}
+
+.ai-import-start p {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.ai-import-turn {
+  max-width: 78%;
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.ai-import-turn--user {
+  align-self: flex-end;
+  background: var(--color-accent-lilac);
+  color: var(--color-primary);
+}
+
+.ai-import-turn--assistant {
+  align-self: flex-start;
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border);
+}
+
+.ai-import-user-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ai-import-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--color-accent-purple-dark);
+}
+
+.ai-import-source a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.ai-import-source small {
+  color: var(--color-tertiary);
+  white-space: nowrap;
+}
+
+.ai-import-thinking,
+.ai-import-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-tertiary);
+}
+
+.ai-import-status {
+  align-self: flex-start;
+  padding-left: 4px;
+}
+
+.ai-import-error {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--color-danger) 10%, transparent);
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+.ai-import-draft {
+  align-self: stretch;
+  border: 1px solid var(--color-accent-purple);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  background: var(--color-surface);
+}
+
+.ai-import-draft-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-import-draft-head svg {
+  flex-shrink: 0;
+  color: var(--color-accent-purple);
+}
+
+.ai-import-draft-head .input {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ai-import-draft-summary {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--color-tertiary);
+}
+
+.ai-import-draft-body {
+  margin-top: 12px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding-right: 6px;
+  border-top: 1px dashed var(--color-border);
+  padding-top: 12px;
+}
+
+.ai-import-draft-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.ai-import-archived {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--color-success);
+}
+
+.ai-import-archived a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ai-import-archived.is-error {
+  color: var(--color-danger);
+}
+
+.ai-import-composer {
+  border-top: 1px solid var(--color-border);
+  padding: 14px 28px 16px;
+  background: var(--color-surface);
+}
+
+.ai-import-composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.ai-import-composer textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  background: var(--color-base);
+  color: var(--color-primary);
+}
+
+.ai-import-composer textarea:focus {
+  outline: 2px solid var(--color-accent-lilac);
+  border-color: var(--color-accent-purple);
+}
+
+.ai-import-send {
+  padding: 10px 14px;
+}
+
+/* 空态的三种输入方式提示 */
+.ai-import-start-modes {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.ai-import-start-modes span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-elevated);
+  color: var(--color-secondary);
+  font-size: 12px;
+}
+
+.ai-import-start-modes svg {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  color: var(--color-accent-purple);
+}
+
+/* 用户消息里附带的图片缩略图 */
+.ai-import-turn-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ai-import-turn-images img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-base);
+}
+
+/* 输入框上方的待发送附件条 */
+.ai-import-attach-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ai-import-attach-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-secondary);
+}
+
+.ai-import-attach-chip {
+  position: relative;
+  display: inline-flex;
+}
+
+.ai-import-attach-chip img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+}
+
+.ai-import-attach-chip button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-elevated);
+  cursor: pointer;
+}
+
+.ai-import-composer-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.ai-import-attach {
+  padding: 10px 12px;
+}
+
+.ai-import-composer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.ai-import-hint {
+  font-size: 11px;
+  color: var(--color-tertiary);
+}
+
+@media (max-width: 720px) {
+  .ai-import-turn {
+    max-width: 92%;
+  }
+
+  .ai-import-thread,
+  .ai-import-composer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+/* ── 统一导入入口：四种方式共用一个 tab 栏 ── */
+.import-hub-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 22px;
+  padding: 4px;
+  background: var(--color-hover);
+  border-radius: 12px;
+}
+
+.import-hub-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  background: none;
+  border: 0;
+  border-radius: 9px;
+  color: var(--color-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .16s ease, color .16s ease;
+}
+
+.import-hub-tabs button:hover {
+  color: var(--color-primary);
+}
+
+.import-hub-tabs button[aria-selected="true"] {
+  background: var(--color-elevated);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(15, 23, 42, .1));
+}
+
+/* 面板保活：非当前 tab 用 hidden 隐藏，但要压过面板自身的 display。 */
+.import-hub-panel[hidden] {
+  display: none !important;
+}

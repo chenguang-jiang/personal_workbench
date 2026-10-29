@@ -5,6 +5,13 @@ import { getVaultConfig } from "@/lib/obsidian-sync";
 export const QUIZ_FOLDER =
   process.env.QUIZ_VAULT_FOLDER?.trim() || "JCG/学习资料/软考/每日题库";
 
+/** 真题套卷目录（整卷练习，不参与每日提醒/欠账） */
+export const QUIZ_PAPER_FOLDER =
+  process.env.QUIZ_PAPER_FOLDER?.trim() || "JCG/学习资料/软考/真题套卷";
+
+/** 套卷 id 前缀，与每日题集的 YYYY-MM-DD 区分 */
+export const PAPER_PREFIX = "paper:";
+
 export interface QuizOption {
   key: string;
   text: string;
@@ -57,7 +64,38 @@ export function listQuizDays(): { day: string; file: string }[] {
   return out.sort((a, b) => (a.day < b.day ? 1 : -1));
 }
 
-/** 提取答案块：合并所有 <details> 内容（案例题含多个子问题）；回退到「答案：」标记之后的正文 */
+/** 真题套卷列表：id = paper:<文件名去后缀>，按文件名排序 */
+export function listQuizPapers(): { day: string; file: string }[] {
+  const { available, vaultPath } = getVaultConfig();
+  if (!available) return [];
+  const dir = path.join(/* turbopackIgnore: true */ vaultPath, QUIZ_PAPER_FOLDER);
+  if (!fs.existsSync(/* turbopackIgnore: true */ dir)) return [];
+  const out: { day: string; file: string }[] = [];
+  for (const name of fs.readdirSync(/* turbopackIgnore: true */ dir)) {
+    if (!name.endsWith(".md")) continue;
+    out.push({
+      day: PAPER_PREFIX + name.replace(/\.md$/, ""),
+      file: path.join(/* turbopackIgnore: true */ dir, name),
+    });
+  }
+  return out.sort((a, b) => a.day.localeCompare(b.day));
+}
+
+/** 每日题集 + 真题套卷的合并列表（套卷排在每日题集之后） */
+export function listAllQuizSets(): { day: string; file: string }[] {
+  return [...listQuizDays(), ...listQuizPapers()];
+}
+
+export function isPaperId(id: string): boolean {
+  return id.startsWith(PAPER_PREFIX);
+}
+
+/** 套卷显示名：去掉前缀与「-选择与案例」等后缀 */
+export function paperLabel(id: string): string {
+  return id.slice(PAPER_PREFIX.length);
+}
+
+/** 提取答案块：合并所有 <details> 内容（案例题含多个子问题）；回退到「答案：」标记之后的正文；再回退到「参考答案」标题之后 */
 function extractAnswerBlock(section: string): string {
   const blocks = [...section.matchAll(/<details[^>]*>([\s\S]*?)<\/details>/g)].map(
     (match) => match[1],
@@ -65,6 +103,11 @@ function extractAnswerBlock(section: string): string {
   if (blocks.length > 0) return blocks.join("\n\n");
   const marker = section.match(/\*{0,2}答案[:：]/);
   if (marker && marker.index !== undefined) return section.slice(marker.index);
+  const refHead = section.match(/^#{1,6}\s*参考答案\s*$/m);
+  if (refHead && refHead.index !== undefined) {
+    const rest = section.slice(refHead.index).replace(/^#{1,6}\s*参考答案\s*\n/, "");
+    return `答案：\n${rest}`;
+  }
   return "";
 }
 
@@ -84,7 +127,9 @@ function parseStem(section: string): string {
     .split("\n")
     .slice(1)
     .join("\n");
-  const cut = body.match(/\n\s*(?:[A-F][.、)）]\s|\*{0,2}答案[:：])/);
+  const cut = body.match(
+    /\n\s*(?:[-*]\s*)?(?:[A-F][.、)）]\s|\*{0,2}答案[:：])|\n#{1,6}\s*参考答案\s*$/m,
+  );
   const text =
     cut && cut.index !== undefined ? body.slice(0, cut.index) : body;
   const paragraphs: string[] = [];
@@ -101,12 +146,12 @@ function parseStem(section: string): string {
   return paragraphs.join("\n\n");
 }
 
-/** 解析选项行：A. / A、 / A) 等 */
+/** 解析选项行：A. / A、 / A) 等，兼容列表前缀 - A. */
 function parseOptions(section: string): QuizOption[] {
   const body = section.replace(/<details[\s\S]*?<\/details>/g, "");
   const options: QuizOption[] = [];
   for (const line of body.split("\n")) {
-    const opt = line.trim().match(/^([A-F])[.、)）]\s*(.+)$/);
+    const opt = line.trim().match(/^(?:[-*]\s*)?([A-F])[.、)）]\s*(.+)$/);
     if (opt) options.push({ key: opt[1], text: opt[2].trim() });
   }
   return options;
@@ -140,8 +185,13 @@ export function parseQuizSet(filePath: string, day: string): QuizSet | null {
   const titleMatch = body.match(/^#\s+(.+)$/m);
   const introMatch = body.match(/^>\s*(.+)$/m);
 
-  const sections = body
-    .split(/\n(?=##\s)/)
+  // 真题套卷标题归一化：### 第 N 题 / # 试题N → ## 级题目小节
+  const normalized = body
+    .replace(/^###\s+(第\s*\d+\s*题.*)$/gm, "## $1")
+    .replace(/^#\s+试题\s*(\d+)\s*$/gm, "## 试题 $1（案例分析）");
+
+  const sections = normalized
+    .split(/\n(?=##\s(?!参考答案))/)
     .filter((part) => part.startsWith("## "));
   const questions: QuizQuestion[] = [];
 
@@ -150,7 +200,7 @@ export function parseQuizSet(filePath: string, day: string): QuizSet | null {
       .split("\n")[0]
       .replace(/^##\s*/, "")
       .trim();
-    if (!/题目|子问题/.test(heading)) continue;
+    if (!/题目|子问题|试题|第\s*\d+\s*题/.test(heading)) continue;
 
     const answerBlock = extractAnswerBlock(section);
     const options = parseOptions(section);
@@ -221,6 +271,8 @@ export function computeNudge(
   now = new Date(),
 ): NudgeInfo {
   if (status === "done") return { stage: 0, due: false, message: "" };
+  if (isPaperId(day) || !/^\d{4}-\d{2}-\d{2}$/.test(day))
+    return { stage: 0, due: false, message: "" };
   const [y, m, d] = day.split("-").map(Number);
   const start = new Date(y, m - 1, d, DAY_START_HOUR, 0, 0);
   const elapsedMs = now.getTime() - start.getTime();

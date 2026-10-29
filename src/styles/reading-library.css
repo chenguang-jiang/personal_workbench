@@ -1,0 +1,355 @@
+/* Reading library */
+.reading-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.reading-toolbar > label {
+  display: flex;
+  min-height: 40px;
+  flex: 1;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  padding: 0 13px;
+}
+
+.reading-toolbar svg {
+  width: 15px;
+  color: var(--color-tertiary);
+}
+
+.reading-toolbar input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+}
+
+.reading-count {
+  display: grid;
+  width: 66px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+
+.reading-count strong {
+  align-self: end;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.reading-count span {
+  align-self: start;
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.current-reading {
+  display: grid;
+  min-height: 150px;
+  grid-template-columns: 86px 1fr auto;
+  align-items: center;
+  gap: 22px;
+  border-color: color-mix(
+    in oklab,
+    var(--color-accent-purple) 58%,
+    var(--color-border)
+  );
+  padding: 18px;
+  box-shadow: 0 14px 32px
+    color-mix(in oklab, var(--color-accent-purple) 8%, transparent);
+}
+
+.book-cover {
+  display: flex;
+  width: 86px;
+  height: 112px;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid
+    color-mix(in oklab, var(--color-accent-purple) 40%, var(--color-border));
+  border-radius: 3px 7px 7px 3px;
+  background: var(--color-accent-lilac);
+  padding: 10px;
+  box-shadow:
+    inset 5px 0 0
+      color-mix(in oklab, var(--color-accent-purple) 16%, transparent),
+    5px 7px 14px color-mix(in oklab, var(--color-primary) 10%, transparent);
+}
+
+.book-cover span,
+.book-cover small {
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.book-cover strong {
+  font-family: var(--font-serif);
+  font-size: 30px;
+}
+
+.current-reading-copy {
+  min-width: 0;
+}
+
+.current-reading-copy h2 {
+  margin: 2px 0 6px;
+  font-family: var(--font-serif);
+  font-size: 24px;
+  letter-spacing: -0.01em;
+}
+
+.current-reading-copy > p:not(.micro-label) {
+  margin: 0 0 14px;
+  color: var(--color-secondary);
+  font-size: 12px;
+}
+
+.current-reading-copy .progress-track {
+  width: min(100%, 360px);
+}
+
+.current-reading-skeleton {
+  min-height: 150px;
+}
+
+.reading-library-section {
+  margin-top: 32px;
+}
+
+.section-heading {
+  margin-bottom: 14px;
+}
+
+.article-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.article-card {
+  display: grid;
+  min-height: 158px;
+  grid-template-columns: 54px 1fr 18px;
+  align-items: stretch;
+  gap: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: 15px;
+  transition:
+    border-color 180ms ease,
+    transform 180ms var(--ease-out-expo),
+    box-shadow 180ms ease;
+}
+
+.article-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(
+    in oklab,
+    var(--color-accent-purple) 48%,
+    var(--color-border)
+  );
+  box-shadow: var(--shadow-md);
+}
+
+.book-spine {
+  display: flex;
+  width: 54px;
+  flex-direction: column;
+  justify-content: space-between;
+  border-radius: 3px 6px 6px 3px;
+  background: var(--color-accent-lilac);
+  padding: 8px;
+  box-shadow: inset 4px 0 0
+    color-mix(in oklab, var(--color-accent-purple) 16%, transparent);
+}
+
+.book-spine--2 {
+  background: color-mix(in oklab, var(--color-accent-green) 14%, white);
+}
+.book-spine--3 {
+  background: color-mix(in oklab, var(--color-accent-amber) 15%, white);
+}
+
+.book-spine span,
+.book-spine strong {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  writing-mode: vertical-rl;
+}
+
+.book-spine strong {
+  align-self: end;
+  color: var(--color-secondary);
+  writing-mode: initial;
+}
+
+.article-card-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.article-card time {
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.article-card h3 {
+  margin: 10px 0 8px;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.article-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: var(--color-tertiary);
+  font-size: 11px;
+}
+
+.article-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.article-meta svg {
+  width: 11px;
+  height: 11px;
+}
+
+.article-card-copy .progress-track {
+  margin-top: auto;
+}
+
+.article-card > svg {
+  width: 15px;
+  align-self: center;
+  color: var(--color-tertiary);
+}
+
+.article-skeleton {
+  min-height: 158px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 22px;
+  color: var(--color-secondary);
+  font-size: 11px;
+}
+
+.back-link:hover {
+  color: var(--color-accent-purple);
+}
+
+.back-link svg {
+  width: 14px;
+}
+
+.article-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  overflow: hidden;
+}
+
+.article-editor-main {
+  display: grid;
+  gap: 22px;
+  padding: 26px;
+}
+
+.article-editor label,
+.article-editor-side {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.article-editor label > span {
+  color: var(--color-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.article-title-input {
+  height: 50px;
+  font-family: var(--font-serif);
+  font-size: 18px;
+}
+
+.article-content-input {
+  min-height: 490px;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.article-editor-side {
+  border-left: 1px solid var(--color-border);
+  background: color-mix(
+    in oklab,
+    var(--color-surface) 92%,
+    var(--color-elevated)
+  );
+  padding: 22px;
+}
+
+.article-editor-side label {
+  margin: 26px 0 18px;
+}
+
+.article-editor-side label small {
+  color: var(--color-tertiary);
+  font-size: 11.5px;
+}
+
+.editor-note {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 20px;
+}
+
+.editor-note svg {
+  width: 20px;
+  color: var(--color-accent-purple);
+}
+
+.editor-note strong {
+  font-family: var(--font-serif);
+  font-size: 17px;
+}
+
+.editor-note p {
+  margin: 0;
+  color: var(--color-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.editor-save {
+  margin-bottom: 6px;
+}

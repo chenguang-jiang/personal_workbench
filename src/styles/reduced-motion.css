@@ -1,0 +1,22 @@
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* 加载指示仍需可见：去掉旋转，改为静态的半透明态，避免“冻结在某一帧”像是卡住 */
+  :is(.is-spinning, .loader-spin, .spin, .animate-spin) {
+    opacity: 0.6;
+  }
+
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-delay: 0s !important;
+    animation-duration: 0s !important;
+  }
+}

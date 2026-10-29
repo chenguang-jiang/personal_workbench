@@ -42,7 +42,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="page-frame page-frame--wide">
+    <div className="page-frame page-frame--wide dashboard-page">
       <PageHeader
         eyebrow={`DAWN KNOWLEDGE BASE · ${dateFormatter.format(new Date())}`}
         title={t("dash_title")}

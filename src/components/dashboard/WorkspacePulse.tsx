@@ -8,9 +8,11 @@ const BLINK_DURATION = 560;
 type WorkspacePulseProps = {
   compact?: boolean;
   onBlinkComplete?: () => void;
+  /** 覆盖默认的 aria-label/title，用于眨眼后会唤出具体操作的场景 */
+  actionLabel?: string;
 };
 
-export function WorkspacePulse({ compact = false, onBlinkComplete }: WorkspacePulseProps) {
+export function WorkspacePulse({ compact = false, onBlinkComplete, actionLabel }: WorkspacePulseProps) {
   const rootRef = useRef<HTMLButtonElement>(null);
   const blinkTimerRef = useRef<number | null>(null);
 
@@ -101,8 +103,8 @@ export function WorkspacePulse({ compact = false, onBlinkComplete }: WorkspacePu
       ref={rootRef}
       type="button"
       className={compact ? "workspace-pulse workspace-pulse--compact" : "workspace-pulse"}
-      aria-label="AI 索引在线；眼睛会跟随指针，点击可以眨眼"
-      title="点击眨眼"
+      aria-label={actionLabel ?? "AI 索引在线；眼睛会跟随指针，点击可以眨眼"}
+      title={actionLabel ?? "点击眨眼"}
       onClick={blink}
     >
       <span className="workspace-eye-shell" aria-hidden="true">

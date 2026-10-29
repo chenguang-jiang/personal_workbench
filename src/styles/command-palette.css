@@ -1,0 +1,200 @@
+/* Command palette */
+.command-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: color-mix(in oklab, var(--color-primary) 24%, transparent);
+  padding: 14vh 20px 20px;
+  backdrop-filter: blur(5px);
+  animation: fade-in 150ms ease-out both;
+}
+
+.command-dialog {
+  width: min(100%, 580px);
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: 0 28px 80px
+    color-mix(in oklab, var(--color-primary) 22%, transparent);
+  animation: dialog-in 190ms var(--ease-out-expo) both;
+}
+
+.command-input-row {
+  display: flex;
+  height: 58px;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 17px;
+}
+
+.command-input-row svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-accent-purple);
+}
+
+.command-input-row input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 14px;
+}
+
+.command-results {
+  display: grid;
+  max-height: 380px;
+  gap: 3px;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.command-results > p {
+  margin: 4px 8px 6px;
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+}
+
+.command-result {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  gap: 11px;
+  border-radius: 8px;
+  padding: 0 10px;
+  transition: background-color 150ms ease;
+}
+
+.command-result:hover {
+  background: var(--color-accent-lilac);
+}
+
+.command-result > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-accent-purple);
+}
+
+.command-result > span:nth-child(2) {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+}
+
+.command-result strong {
+  font-size: 12px;
+}
+
+.command-result small,
+.command-result > span:last-child {
+  color: var(--color-tertiary);
+  font-size: 11.5px;
+}
+
+.command-empty {
+  padding: 34px 12px;
+  color: var(--color-tertiary);
+  text-align: center;
+  font-size: 12px;
+}
+
+button.command-result {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.command-result--active {
+  background: var(--color-accent-lilac);
+}
+
+.command-result-copy {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+
+.command-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.command-folder {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.command-tag {
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-accent-purple) 10%, transparent);
+  color: var(--color-accent-purple);
+  padding: 1px 7px;
+  font-size: 11.5px;
+}
+
+.command-match {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0 5px;
+  color: var(--color-tertiary);
+  font-size: 11px;
+}
+
+.command-enter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-elevated);
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.command-result--active .command-enter,
+.command-result:hover .command-enter {
+  opacity: 1;
+  transform: translateX(0);
+  color: var(--color-accent-purple);
+  border-color: var(--color-accent-purple);
+}
+
+.command-score {
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.command-result mark {
+  background: color-mix(in oklab, var(--color-accent-purple) 22%, transparent);
+  color: var(--color-accent-purple-dark);
+  border-radius: 3px;
+  padding: 0 1px;
+}

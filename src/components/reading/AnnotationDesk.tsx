@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowRight,
-  Bot,
   CheckCircle2,
   Database,
   Folder,
@@ -14,10 +12,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { createDawnHandoff } from "@/lib/dawn-agent-handoff-client";
 
-export type AnnotationTab = "note" | "agent" | "ingest";
+export type AnnotationTab = "note" | "ingest";
 
 type SelectionAnchor = {
   text: string;
@@ -50,12 +46,10 @@ interface AnnotationDeskProps {
   articleTitle: string;
   articleContent: string;
   articleSource?: string | null;
-  articleUrl?: string | null;
   notes: Note[];
   highlights: Highlight[];
   activeTab: AnnotationTab;
   selection: SelectionAnchor | null;
-  initialQuestion?: string;
   onTabChange: (tab: AnnotationTab) => void;
   onClose: () => void;
   onNoteCreated: (note: Note) => void;
@@ -63,12 +57,6 @@ interface AnnotationDeskProps {
   onNoteDeleted: (id: string) => void;
   onHighlightDeleted: (id: string) => void;
 }
-
-const QUICK_TASKS = [
-  "用更简单的话解释，并说明它与全文的关系",
-  "检查这段观点的前提、漏洞和反例",
-  "把这段内容转成可执行的项目任务",
-];
 
 // 取笔记开头第一段引用行（理解记录的 > 块），用于筛选时匹配当前选择
 function firstQuoteBlock(content: string): string {
@@ -86,12 +74,10 @@ export function AnnotationDesk({
   articleTitle,
   articleContent,
   articleSource,
-  articleUrl,
   notes,
   highlights,
   activeTab,
   selection,
-  initialQuestion = "",
   onTabChange,
   onClose,
   onNoteCreated,
@@ -99,11 +85,7 @@ export function AnnotationDesk({
   onNoteDeleted,
   onHighlightDeleted,
 }: AnnotationDeskProps) {
-  const router = useRouter();
   const [noteInput, setNoteInput] = useState("");
-  const [question, setQuestion] = useState(
-    initialQuestion || (selection?.text ? QUICK_TASKS[0] : "概括全文的核心观点，并给出下一步可执行建议"),
-  );
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [folders, setFolders] = useState<VaultFolder[]>([]);
@@ -207,32 +189,6 @@ export function AnnotationDesk({
     }
   }
 
-  async function handoffToDawn() {
-    const instruction = question.trim();
-    if (!instruction || busy) return;
-    setBusy(true);
-    setNotice("");
-    try {
-      const handoff = await createDawnHandoff({
-        sourceType: selection?.text ? "reading-selection" : "reading-document",
-        sourceTitle: articleTitle,
-        sourcePath: articleUrl?.startsWith("obsidian://") ? articleUrl.slice("obsidian://".length) : articleUrl ?? undefined,
-        sourceRef: articleId,
-        selectedText: selection?.text || undefined,
-        context: selection?.context || articleContent.slice(0, 36_000),
-        instruction,
-        metadata: {
-          articleSource: articleSource ?? "local",
-          articleId,
-        },
-      });
-      router.push(`/dawn-agent?handoff=${handoff.id}`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "无法交给 Dawn Agent");
-      setBusy(false);
-    }
-  }
-
   async function deleteHighlight(id: string) {
     if (!window.confirm("删除这条批注？正文里的标记也会一并消失。")) return;
     try {
@@ -299,7 +255,6 @@ export function AnnotationDesk({
 
       <div className="annotation-tabs" role="tablist" aria-label="批注功能">
         <DeskTab active={activeTab === "note"} onClick={() => onTabChange("note")} icon={StickyNote} label="笔记" badge={totalNotes} />
-        <DeskTab active={activeTab === "agent"} onClick={() => onTabChange("agent")} icon={Bot} label="Dawn Agent" />
         <DeskTab active={activeTab === "ingest"} onClick={() => onTabChange("ingest")} icon={Database} label="入库" />
       </div>
 
@@ -384,45 +339,6 @@ export function AnnotationDesk({
                   ))}
                 </>
               )}
-            </div>
-          </section>
-        )}
-
-        {activeTab === "agent" && (
-          <section className="annotation-section annotation-agent">
-            <div className="annotation-section-title">
-              <div><p className="micro-label">HAND OFF TO DAWN</p><h2>{selection?.text ? "把这段内容变成 Agent 任务" : "让 Agent 接手当前文档"}</h2></div>
-              <Bot aria-hidden="true" />
-            </div>
-            <div className="annotation-agent-context">
-              <Bot aria-hidden="true" />
-              <span><strong>上下文已准备</strong><small>{selection?.text ? "选中原文 + 附近段落 + 当前文档" : "当前文档标题 + 正文内容"}</small></span>
-            </div>
-            {selection?.text && <QuoteCard text={selection.text} label="将交给 Dawn Agent 的原文" />}
-            <div className="annotation-quick-questions">
-              {QUICK_TASKS.map((item) => <button type="button" key={item} className={question === item ? "is-active" : ""} onClick={() => setQuestion(item)} disabled={busy}>{item}</button>)}
-            </div>
-            <div className="ai-composer">
-              <textarea
-                autoFocus
-                className="textarea annotation-textarea"
-                value={question}
-                onChange={(event) => setQuestion(event.target.value)}
-                onKeyDown={(event) => {
-                  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                    event.preventDefault();
-                    void handoffToDawn();
-                  }
-                }}
-                placeholder="说明你希望 Dawn Agent 理解、验证或执行什么…"
-                rows={4}
-              />
-              <div className="ai-composer-actions">
-                <span className="annotation-agent-hint">下一步选择项目或当前 Agent 会话</span>
-                <button type="button" className="button button-ink" onClick={() => void handoffToDawn()} disabled={busy || !question.trim()}>
-                  {busy ? <Loader2 className="ai-spinner" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />} {busy ? "正在打包…" : "交给 Dawn Agent"}
-                </button>
-              </div>
             </div>
           </section>
         )}

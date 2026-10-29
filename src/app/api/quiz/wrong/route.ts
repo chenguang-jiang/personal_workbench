@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { listQuizDays, parseQuizSet } from "@/lib/quiz";
+import { listAllQuizSets, parseQuizSet } from "@/lib/quiz";
 
 // GET /api/quiz/wrong — 错题本：跨题集汇总手动收录的错题
 export async function GET() {
@@ -9,7 +9,7 @@ export async function GET() {
   });
   if (rows.length === 0) return NextResponse.json({ items: [] });
 
-  const sets = new Map(listQuizDays().map((entry) => [entry.day, entry.file]));
+  const sets = new Map(listAllQuizSets().map((entry) => [entry.day, entry.file]));
   const cache = new Map<
     string,
     ReturnType<typeof parseQuizSet> | null

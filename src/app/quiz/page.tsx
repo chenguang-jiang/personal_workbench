@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlarmClock,
+  AlertTriangle,
   Bell,
   BellOff,
   BookMarked,
@@ -18,6 +19,8 @@ import { renderInlineMarkdown, renderMiniMarkdown } from "@/lib/mini-markdown";
 
 interface QuizListItem {
   day: string;
+  label: string;
+  isPaper: boolean;
   status: string;
   completedAt: string | null;
   nudgeDue: boolean;
@@ -91,11 +94,22 @@ export default function QuizPage() {
   const [wrongItems, setWrongItems] = useState<WrongItem[] | null>(null);
   const [wrongTotal, setWrongTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [notify, setNotify] = useState<
     "default" | "granted" | "denied" | "unsupported"
   >("default");
   const questionsRef = useRef<HTMLDivElement>(null);
   const lastNotifiedStage = useRef<number>(0);
+  const errorTimer = useRef<number>(0);
+
+  // 提交失败必须看得见：错误横幅 6 秒后自动消失
+  const flashError = useCallback((message: string) => {
+    setActionError(message);
+    window.clearTimeout(errorTimer.current);
+    errorTimer.current = window.setTimeout(() => setActionError(null), 6000);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(errorTimer.current), []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -171,6 +185,15 @@ export default function QuizPage() {
     }
   }, [nudge, notify]);
 
+  async function readError(response: Response, fallback: string) {
+    try {
+      const data = await response.json();
+      return String(data.error ?? fallback);
+    } catch {
+      return `${fallback}（HTTP ${response.status}）`;
+    }
+  }
+
   async function post(
     action: string,
     extra: Record<string, unknown> = {},
@@ -182,7 +205,10 @@ export default function QuizPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, ...extra }),
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      flashError(await readError(response, "提交失败，请重试"));
+      return false;
+    }
     const data = await response.json();
     if (day === selected) {
       if (data.state) setState(data.state);
@@ -191,6 +217,7 @@ export default function QuizPage() {
       if (data.wrong) setWrong((current) => ({ ...current, [day]: data.wrong }));
     }
     void loadList();
+    return true;
   }
 
   async function toggleWrong(question: QuizQuestion) {
@@ -210,6 +237,7 @@ export default function QuizPage() {
     });
     if (!response.ok) {
       setWrong((current) => ({ ...current, [selected]: list }));
+      flashError(await readError(response, "错题本更新失败，请重试"));
       return;
     }
     setWrongTotal((count) => Math.max(0, count + (on ? 1 : -1)));
@@ -221,7 +249,10 @@ export default function QuizPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "wrong", qIndex: item.qIndex, on: false }),
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      flashError(await readError(response, "错题本移除失败，请重试"));
+      return;
+    }
     setWrong((current) => ({
       ...current,
       [item.setId]: (current[item.setId] ?? []).filter(
@@ -251,15 +282,16 @@ export default function QuizPage() {
     });
   }
 
-  function submitMulti(question: QuizQuestion) {
+  async function submitMulti(question: QuizQuestion) {
     const choice = (picks[question.index] ?? []).slice().sort().join("");
     if (!choice) return;
+    const ok = await post("answer", { qIndex: question.index, choice });
+    if (!ok) return;
     setPicks((current) => {
       const next = { ...current };
       delete next[question.index];
       return next;
     });
-    void post("answer", { qIndex: question.index, choice });
   }
 
   function submitEssay(question: QuizQuestion) {
@@ -274,8 +306,9 @@ export default function QuizPage() {
     return map;
   }, [answers]);
 
-  const doneItems = useMemo(() => items.filter((item) => item.status === "done"), [items]);
-  const todoItems = useMemo(() => items.filter((item) => item.status !== "done"), [items]);
+  const doneItems = useMemo(() => items.filter((item) => item.status === "done" && !item.isPaper), [items]);
+  const todoItems = useMemo(() => items.filter((item) => item.status !== "done" && !item.isPaper), [items]);
+  const paperItems = useMemo(() => items.filter((item) => item.isPaper), [items]);
 
   const correctCount = answers.filter(
     (row) => row.correct && revealed[row.qIndex],
@@ -311,15 +344,19 @@ export default function QuizPage() {
               done ? "quiz-day-dot quiz-day-dot--done" : "quiz-day-dot quiz-day-dot--todo"
             }
           />
-          <strong>{item.day.slice(5).replace("-", "/")}</strong>
+          <strong>{item.isPaper ? item.label : item.day.slice(5).replace("-", "/")}</strong>
           <small>
-            {item.isToday
-              ? "今天"
-              : done
+            {item.isPaper
+              ? done
                 ? "已完成"
-                : item.isOverdue
-                  ? "欠账"
-                  : "待做"}
+                : "套卷"
+              : item.isToday
+                ? "今天"
+                : done
+                  ? "已完成"
+                  : item.isOverdue
+                    ? "欠账"
+                    : "待做"}
           </small>
           {item.nudgeDue && item.isToday && (
             <em className="quiz-day-nudge">!</em>
@@ -399,6 +436,14 @@ export default function QuizPage() {
             )}
             {doneItems.map((item) => renderDayButton(item))}
           </div>
+          {paperItems.length > 0 && (
+            <div className="quiz-day-group">
+              <p className="quiz-day-group-title">
+                真题套卷 <span>{paperItems.length}</span>
+              </p>
+              {paperItems.map((item) => renderDayButton(item))}
+            </div>
+          )}
         </div>
         <p className="quiz-legend">
           <i className="quiz-day-dot quiz-day-dot--todo" /> 未完成
@@ -411,6 +456,20 @@ export default function QuizPage() {
       </section>
 
       <section className="quiz-main">
+        {actionError && (
+          <div className="quiz-error-banner" role="alert">
+            <AlertTriangle aria-hidden="true" />
+            <span>{actionError}</span>
+            <button
+              type="button"
+              className="quiz-error-close"
+              aria-label="关闭提示"
+              onClick={() => setActionError(null)}
+            >
+              ×
+            </button>
+          </div>
+        )}
         {wrongView ? (
           <div className="quiz-wrong-view">
             <header className="quiz-head">
@@ -544,7 +603,9 @@ export default function QuizPage() {
           <>
             <header className="quiz-head">
               <div>
-                <p className="micro-label">{set.day}</p>
+                <p className="micro-label">
+                  {set.day.startsWith("paper:") ? set.day.slice(6) : set.day}
+                </p>
                 <h2>{set.title}</h2>
                 {set.intro && (
                   <p

@@ -1,0 +1,48 @@
+/* ===== 题库机：多选交互 ===== */
+.quiz-option--picked {
+  border-color: var(--color-accent-purple);
+  background: color-mix(in oklab, var(--color-accent-lilac) 55%, transparent);
+}
+
+.quiz-option--mine {
+  border-color: var(--color-accent-purple);
+  background: color-mix(in oklab, var(--color-accent-lilac) 40%, transparent);
+}
+
+.quiz-option--mine .quiz-option-key {
+  border-color: var(--color-accent-purple);
+  background: var(--color-accent-purple);
+  color: #fff;
+}
+
+.quiz-option--picked .quiz-option-key {
+  border-color: var(--color-accent-purple);
+  background: var(--color-accent-purple);
+  color: #fff;
+}
+
+.quiz-multi-foot {
+  display: flex;
+  gap: 8px;
+}
+
+.quiz-submit {
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-accent-purple);
+  padding: 7px 18px;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quiz-clear {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  padding: 7px 14px;
+  color: var(--color-tertiary);
+  font-size: 12.5px;
+  cursor: pointer;
+}

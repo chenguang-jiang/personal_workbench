@@ -1,0 +1,101 @@
+/* ---------- 主题色（accent）覆盖 ---------- */
+/* --accent-on-dark：同一主题色在暗色底上的提亮版本，保证作为文字时对比度 ≥ 4.5:1 */
+html {
+  --accent-on-dark: oklch(0.72 0.17 296);
+}
+html[data-accent="blue"] {
+  --accent-on-dark: oklch(0.72 0.15 264);
+  --color-accent-purple: oklch(0.52 0.22 264);
+  --color-accent-purple-dark: oklch(0.42 0.2 264);
+  --color-accent-lilac: oklch(0.94 0.04 264);
+  --color-hover: oklch(0.952 0.024 264);
+}
+html[data-accent="teal"] {
+  --accent-on-dark: oklch(0.74 0.11 175);
+  --color-accent-purple: oklch(0.51 0.1 175);
+  --color-accent-purple-dark: oklch(0.45 0.1 175);
+  --color-accent-lilac: oklch(0.94 0.03 175);
+  --color-hover: oklch(0.952 0.018 175);
+}
+html[data-accent="orange"] {
+  --accent-on-dark: oklch(0.74 0.15 55);
+  --color-accent-purple: oklch(0.55 0.16 50);
+  --color-accent-purple-dark: oklch(0.48 0.15 50);
+  --color-accent-lilac: oklch(0.94 0.04 55);
+  --color-hover: oklch(0.952 0.024 55);
+}
+html[data-accent="crimson"] {
+  --accent-on-dark: oklch(0.72 0.16 25);
+  --color-accent-purple: oklch(0.53 0.19 25);
+  --color-accent-purple-dark: oklch(0.43 0.17 25);
+  --color-accent-lilac: oklch(0.94 0.04 25);
+  --color-hover: oklch(0.952 0.024 25);
+}
+html[data-accent="magenta"] {
+  --accent-on-dark: oklch(0.72 0.17 340);
+  --color-accent-purple: oklch(0.54 0.2 340);
+  --color-accent-purple-dark: oklch(0.44 0.18 340);
+  --color-accent-lilac: oklch(0.94 0.045 340);
+  --color-hover: oklch(0.952 0.026 340);
+}
+html[data-accent="amber"] {
+  --accent-on-dark: oklch(0.8 0.13 82);
+  --color-accent-purple: oklch(0.56 0.12 75);
+  --color-accent-purple-dark: oklch(0.46 0.11 75);
+  --color-accent-lilac: oklch(0.94 0.04 85);
+  --color-hover: oklch(0.952 0.022 85);
+}
+
+/* ---------- 暗色模式（放在 accent 之后，组合时优先） ---------- */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --color-base: oklch(0.175 0.008 300);
+  --color-surface: oklch(0.21 0.01 300);
+  --color-elevated: oklch(0.25 0.012 300);
+  --color-primary: oklch(0.93 0.006 300);
+  --color-secondary: oklch(0.76 0.01 300);
+  --color-tertiary: oklch(0.63 0.01 300);
+  --color-border: oklch(0.31 0.012 300);
+  --color-border-strong: oklch(0.42 0.015 300);
+  --color-accent-purple: var(--accent-on-dark);
+  --color-accent-green: oklch(0.72 0.15 150);
+  --color-accent-amber: oklch(0.78 0.14 74);
+  --color-accent-rose: oklch(0.7 0.17 22);
+  --color-danger: oklch(0.7 0.16 27);
+  --color-success: oklch(0.72 0.14 150);
+  --color-hover: color-mix(
+    in oklab,
+    var(--color-accent-purple) 16%,
+    var(--color-elevated)
+  );
+  --color-accent-lilac: color-mix(
+    in oklab,
+    var(--color-accent-purple) 20%,
+    var(--color-surface)
+  );
+  --color-accent-purple-dark: color-mix(
+    in oklab,
+    var(--color-accent-purple) 70%,
+    white
+  );
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 14px 36px rgb(0 0 0 / 0.5);
+}
+
+@media print {
+  html[data-theme="dark"] {
+    color-scheme: light;
+    --color-base: #fff;
+    --color-surface: #fff;
+    --color-elevated: #f4f2f7;
+    --color-primary: #262230;
+    --color-secondary: #5a5566;
+    --color-tertiary: #7a7586;
+    --color-border: #e4e1ea;
+    --color-border-strong: #c9c4d4;
+    --color-accent-lilac: #efeaf9;
+    --color-accent-purple-dark: var(--color-accent-purple);
+    --shadow-sm: none;
+    --shadow-md: none;
+  }
+}

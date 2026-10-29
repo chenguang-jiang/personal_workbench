@@ -1,0 +1,463 @@
+.kb-conversation {
+  display: grid;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.kb-thread {
+  width: 100%;
+  min-width: 0;
+  padding: 24px clamp(20px, 3vw, 40px) 32px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+.kb-start {
+  width: 100%;
+  max-width: 760px;
+  margin: clamp(28px, 5vh, 56px) auto 0;
+  text-align: center;
+}
+
+.kb-start > span {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  border: 1px solid
+    color-mix(in oklab, var(--color-accent-purple) 26%, var(--color-border));
+  border-radius: 16px;
+  color: var(--color-accent-purple);
+  background: var(--color-accent-lilac);
+  place-items: center;
+}
+
+.kb-start > span svg {
+  width: 23px;
+}
+
+.kb-start .micro-label {
+  justify-content: center;
+}
+
+.kb-start h2 {
+  max-width: 680px;
+  margin: 8px auto;
+  font-family: var(--font-serif);
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  line-height: 1.28;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.kb-start > p:not(.micro-label) {
+  max-width: 62ch;
+  margin: 0 auto;
+  color: var(--color-secondary);
+  font-size: 11.5px;
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+
+.kb-start-composer {
+  width: 100%;
+  margin-top: 26px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: 0 16px 42px
+    color-mix(in oklab, var(--color-primary) 8%, transparent);
+  text-align: left;
+  transition:
+    border-color 180ms var(--ease-out-expo),
+    box-shadow 180ms var(--ease-out-expo);
+}
+
+.kb-start-composer:focus-within {
+  border-color: color-mix(
+    in oklab,
+    var(--color-accent-purple) 58%,
+    var(--color-border)
+  );
+  box-shadow:
+    0 18px 48px color-mix(in oklab, var(--color-primary) 10%, transparent),
+    0 0 0 3px color-mix(in oklab, var(--color-accent-purple) 10%, transparent);
+}
+
+.kb-start-prompt-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 16px 0;
+}
+
+.kb-start-prompt-meta label {
+  color: var(--color-primary);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.kb-start-prompt-meta span {
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.kb-start-composer > textarea {
+  display: block;
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 16px 16px;
+  resize: none;
+  border: 0;
+  color: var(--color-primary);
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.kb-start-composer > textarea::placeholder,
+.kb-composer textarea::placeholder {
+  color: var(--color-tertiary);
+  opacity: 1;
+}
+
+.kb-start-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(
+    in oklab,
+    var(--color-elevated) 36%,
+    var(--color-surface)
+  );
+}
+
+.kb-start-source {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: 15px auto minmax(120px, 1fr);
+  gap: 7px;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-tertiary);
+  background: var(--color-surface);
+}
+
+.kb-start-source > svg {
+  width: 13px;
+  color: var(--color-accent-purple);
+}
+
+.kb-start-source > span {
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.kb-start-source select {
+  min-width: 0;
+  padding: 0 4px;
+  border: 0;
+  color: var(--color-primary);
+  background: transparent;
+  font-size: 12px;
+}
+
+.kb-start-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  align-items: center;
+}
+
+.kb-start-actions > .button {
+  min-height: 40px;
+  padding-inline: 14px;
+}
+
+.kb-policy-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-elevated);
+}
+
+.kb-policy-toggle button {
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 3px;
+  color: var(--color-tertiary);
+  background: transparent;
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.kb-policy-toggle button.is-active {
+  color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.kb-thread-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  width: min(100%, 780px);
+  margin: 0 auto 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.kb-thread-heading h2 {
+  max-width: 650px;
+  font-size: 19px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.kb-empty-thread {
+  display: flex;
+  width: min(100%, 620px);
+  align-items: center;
+  gap: 9px;
+  margin: 30px auto;
+  padding: 12px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-tertiary);
+  font-size: 12px;
+}
+
+.kb-empty-thread svg {
+  width: 16px;
+  color: var(--color-accent-purple);
+}
+
+.kb-empty-thread p {
+  margin: 0;
+}
+
+.kb-message {
+  width: min(100%, 780px);
+  margin: 0 auto 26px;
+}
+
+.kb-message--user {
+  width: min(88%, 640px);
+  margin-right: 0;
+  padding: 13px 16px;
+  border: 1px solid
+    color-mix(in oklab, var(--color-accent-purple) 18%, var(--color-border));
+  border-radius: var(--radius-lg) var(--radius-lg) 3px var(--radius-lg);
+  background: var(--color-accent-lilac);
+}
+
+.kb-message--user p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.kb-message--assistant > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.kb-message--assistant > header > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  color: var(--color-accent-purple);
+  background: var(--color-accent-lilac);
+  place-items: center;
+}
+
+.kb-message--assistant > header svg {
+  width: 14px;
+}
+
+.kb-message--assistant > header strong {
+  font-family: var(--font-serif);
+  font-size: 13px;
+}
+
+.kb-message--assistant > header small {
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* 答案正文：13.5px / 1.8，主色而非次级灰——长答案以阅读舒适为先 */
+.kb-message--assistant .mini-markdown {
+  color: color-mix(in oklab, var(--color-primary) 88%, var(--color-secondary));
+  font-size: 13.5px;
+  line-height: 1.8;
+}
+
+.kb-message--assistant .mini-markdown h1,
+.kb-message--assistant .mini-markdown h2,
+.kb-message--assistant .mini-markdown h3 {
+  margin: 20px 0 8px;
+  color: var(--color-primary);
+  font-family: var(--font-serif);
+  font-size: 16px;
+  line-height: 1.45;
+  text-wrap: balance;
+}
+
+.kb-message--assistant .mini-markdown p {
+  margin: 0 0 12px;
+  text-wrap: pretty;
+}
+
+.kb-message--assistant .mini-markdown strong {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.kb-citation {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 1px;
+  padding: 0 4px;
+  border: 1px solid
+    color-mix(in oklab, var(--color-accent-purple) 32%, var(--color-border));
+  border-radius: 4px;
+  color: var(--color-accent-purple-dark);
+  background: var(--color-accent-lilac);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kb-citation:hover {
+  border-color: var(--color-accent-purple);
+}
+
+.kb-thinking {
+  display: flex;
+  width: min(100%, 780px);
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto;
+  color: var(--color-tertiary);
+  font-size: 12px;
+}
+
+.kb-thinking svg {
+  width: 14px;
+  animation: spin 900ms linear infinite;
+}
+
+.kb-composer {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  margin: 0 clamp(16px, 3vw, 32px) 16px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: 0 14px 40px
+    color-mix(in oklab, var(--color-primary) 8%, transparent);
+  transition:
+    border-color 180ms var(--ease-out-expo),
+    box-shadow 180ms var(--ease-out-expo);
+}
+
+.kb-composer:focus-within {
+  border-color: color-mix(
+    in oklab,
+    var(--color-accent-purple) 58%,
+    var(--color-border)
+  );
+  box-shadow:
+    0 16px 44px color-mix(in oklab, var(--color-primary) 10%, transparent),
+    0 0 0 3px color-mix(in oklab, var(--color-accent-purple) 10%, transparent);
+}
+
+.kb-composer-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 11px 11px 9px 14px;
+}
+
+.kb-composer textarea {
+  width: 100%;
+  min-height: 48px;
+  max-height: 132px;
+  padding: 4px 0;
+  resize: none;
+  border: 0;
+  color: var(--color-primary);
+  background: transparent;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.kb-composer-send {
+  min-width: 82px;
+  min-height: 40px;
+  justify-content: center;
+}
+
+.kb-composer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(
+    in oklab,
+    var(--color-elevated) 34%,
+    var(--color-surface)
+  );
+}
+
+.kb-composer-meta > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.kb-composer-meta > small {
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.kb-composer svg {
+  width: 13px;
+}

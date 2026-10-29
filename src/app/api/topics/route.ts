@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 const DEFAULT_USER_EMAIL = "creator@workbench.local";
 
@@ -22,7 +23,14 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const body = await readJsonObject<{
+    title?: string;
+    description?: string;
+    angles?: string[];
+    source?: string;
+    sourceId?: string;
+  }>(request);
+  if (!body) return invalidJsonResponse();
   const title = String(body.title || "").trim();
   if (!title) {
     return NextResponse.json({ error: "标题不能为空" }, { status: 400 });

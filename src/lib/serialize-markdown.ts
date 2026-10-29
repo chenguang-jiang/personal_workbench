@@ -21,6 +21,7 @@ function serializeInline(node: Node): string {
       return `*${inner()}*`;
     case "DEL":
     case "S":
+    case "STRIKE":
       return `~~${inner()}~~`;
     case "CODE":
       return `\`${inner()}\``;
@@ -55,6 +56,24 @@ function escapeCell(value: string): string {
   return value.replace(/\|/g, "\\|").replace(/\n/g, " ");
 }
 
+/**
+ * 读取代码块文本并保留换行：contentEditable 里回车会生成 <br> 或 <div>，
+ * textContent 会把它们压成一行，编辑过的代码块保存前必须先还原换行。
+ */
+function codeBlockText(code: HTMLElement): string {
+  function walk(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    const el = node as HTMLElement;
+    if (el.tagName === "BR") return "\n";
+    const inner = Array.from(el.childNodes).map(walk).join("");
+    // 块级容器（div/p）各自独占一行
+    if (/^(DIV|P)$/.test(el.tagName)) return `${inner}\n`;
+    return inner;
+  }
+  return Array.from(code.childNodes).map(walk).join("").replace(/\n+$/, "");
+}
+
 function serializeBlock(el: HTMLElement): string | null {
   const tag = el.tagName;
 
@@ -71,7 +90,8 @@ function serializeBlock(el: HTMLElement): string | null {
 
   if (tag === "PRE") {
     const language = el.getAttribute("data-language") ?? "";
-    const code = el.querySelector("code")?.textContent ?? "";
+    const codeEl = el.querySelector<HTMLElement>("code");
+    const code = codeEl ? codeBlockText(codeEl) : "";
     return `\`\`\`${language}\n${code}\n\`\`\``;
   }
 
@@ -101,18 +121,17 @@ function serializeBlock(el: HTMLElement): string | null {
   }
 
   if (tag === "BLOCKQUOTE") {
-    const text = serializeInlineChildren(el);
-    return text
-      .split("\n")
-      .map((line) => `> ${line}`)
-      .join("\n");
+    return quoteLines(quoteParagraphs(el)).join("\n");
   }
 
   if (tag === "ASIDE" && el.classList.contains("reader-callout")) {
     const typeMatch = [...el.classList].join(" ").match(/reader-callout--([\w-]+)/);
-    const type = typeMatch?.[1] ?? "info";
-    const body = el.querySelector("p") ? serializeInlineChildren(el.querySelector("p")!) : "";
-    return `> [!${type}] ${body}`.trimEnd();
+    const type = el.dataset.callout ?? typeMatch?.[1] ?? "info";
+    const title = el.querySelector<HTMLElement>(":scope > strong");
+    // 保留自定义标题（若用户改了标题文字，以编辑后的为准）与折叠标记
+    const customTitle = el.dataset.title !== undefined && title ? serializeInlineChildren(title).trim() : "";
+    const head = `> [!${type}]${el.dataset.fold ?? ""}${customTitle ? ` ${customTitle}` : ""}`;
+    return [head, ...quoteLines(quoteParagraphs(el))].join("\n");
   }
 
   if (tag === "UL" || tag === "OL") {
@@ -157,10 +176,39 @@ function serializeInlineChildren(el: HTMLElement): string {
   return Array.from(el.childNodes).map(serializeInline).join("");
 }
 
+/** 引用块里的段落（每个 <p> 一段；旧结构无 <p> 时整体作为一段） */
+function quoteParagraphs(el: HTMLElement): string[] {
+  const paragraphs = Array.from(el.querySelectorAll<HTMLElement>(":scope > p"));
+  if (paragraphs.length === 0) return [serializeInlineChildren(el)];
+  return paragraphs.map((p) => serializeInlineChildren(p));
+}
+
+/** 段落之间用空的 > 行分隔，段内换行逐行加 > 前缀 */
+function quoteLines(paragraphs: string[]): string[] {
+  return paragraphs.flatMap((text, index) => [
+    ...(index > 0 ? [">"] : []),
+    ...text.split("\n").map((line) => `> ${line}`),
+  ]);
+}
+
+/**
+ * 裸文本节点（contentEditable 里在空文档/块首落笔时 Chrome 直接插文本节点，
+ * 不包块级元素）按段落序列化，换行保留为软换行。
+ */
+function serializeTextNode(node: Node): string | null {
+  const text = (node.textContent ?? "").trim();
+  return text || null;
+}
+
 /** 序列化整篇 .reader-prose（含 mermaid 图块还原） */
 export function serializeProse(root: HTMLElement): string {
   const blocks: string[] = [];
-  for (const child of Array.from(root.children)) {
+  for (const child of Array.from(root.childNodes)) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      const md = serializeTextNode(child);
+      if (md !== null) blocks.push(md);
+      continue;
+    }
     const el = child as HTMLElement;
     if (el.classList.contains("mermaid-diagram")) {
       const source = el.getAttribute("data-source") ?? "";
@@ -168,8 +216,11 @@ export function serializeProse(root: HTMLElement): string {
       continue;
     }
     if (el.classList.contains("reader-markdown-fragment")) {
-      for (const block of Array.from(el.children)) {
-        const md = serializeBlock(block as HTMLElement);
+      for (const block of Array.from(el.childNodes)) {
+        const md =
+          block.nodeType === Node.TEXT_NODE
+            ? serializeTextNode(block)
+            : serializeBlock(block as HTMLElement);
         if (md !== null) blocks.push(md);
       }
       continue;

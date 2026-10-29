@@ -1,0 +1,295 @@
+/* ── 原位编辑（所见即所得） ── */
+.reader-prose--editing {
+  cursor: text;
+  caret-color: var(--color-primary);
+  user-select: text;
+  /* 空白文档也有可点击落笔的编辑区 */
+  min-height: 45vh;
+}
+
+.reader-prose--editing:focus {
+  outline: none;
+}
+
+.reader-prose--editing .reader-markdown-fragment > *,
+.reader-prose--editing .mermaid-diagram {
+  border-radius: 8px;
+  transition:
+    outline-color 120ms ease,
+    background 120ms ease;
+}
+
+.reader-prose--editing .reader-markdown-fragment > *:hover,
+.reader-prose--editing .mermaid-diagram:hover {
+  outline: 1px dashed var(--color-border-strong);
+  outline-offset: 4px;
+}
+
+.reader-prose--editing .reader-markdown-fragment > *:focus-within {
+  outline: 1px solid var(--color-primary);
+  outline-offset: 4px;
+}
+
+.reader-prose--editing pre .code-copy-btn,
+.reader-prose--editing .reader-img {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.reader-edit-hint {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+@keyframes edit-hint-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.reader-edit-hint--error {
+  background: #3a1620;
+  border-color: #8f3347;
+  color: #ffb7c4;
+}
+
+/* ── 全屏/宽版阅读模式 ── */
+/* 全屏沉浸：隐藏顶栏/进度条/同文件夹抽屉，只留文章，ESC 退出 */
+.reader-shell--wide .reader-toolbar,
+.reader-shell--wide .reader-top-progress,
+.reader-shell--wide .reader-sibling-zone,
+.reader-shell--wide .reader-siblings {
+  display: none;
+}
+
+.reader-shell--wide .reader-scroll {
+  padding-top: 64px;
+}
+
+/* 全屏下正文放大 150%（740px → 1110px），表格/流程图不再局促 */
+
+.reader-shell--wide .reader-article {
+  width: min(100%, 1110px);
+  margin-inline: auto;
+}
+
+.reader-prose td,
+.reader-prose th {
+  overflow-wrap: anywhere;
+}
+
+/* ── 批注台：AI 对话排版 ── */
+.ai-chat-msg.ai-prose {
+  white-space: normal;
+  max-width: 96%;
+}
+
+.ai-prose p {
+  margin: 0 0 0.7em;
+}
+
+.ai-prose p:last-child {
+  margin-bottom: 0;
+}
+
+.ai-prose h1,
+.ai-prose h2,
+.ai-prose h3,
+.ai-prose h4 {
+  margin: 0.9em 0 0.45em;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.ai-prose h1 {
+  font-size: 15px;
+}
+.ai-prose h2 {
+  font-size: 14px;
+}
+.ai-prose h3,
+.ai-prose h4 {
+  font-size: 13px;
+}
+
+.ai-prose ul,
+.ai-prose ol {
+  margin: 0.4em 0 0.7em;
+  padding-left: 1.3em;
+}
+
+.ai-prose ul {
+  list-style: disc outside;
+}
+.ai-prose ol {
+  list-style: decimal outside;
+}
+
+.ai-prose li {
+  margin: 0.25em 0;
+}
+
+.ai-prose code {
+  border-radius: 5px;
+  background: color-mix(in oklab, var(--color-primary) 10%, transparent);
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
+.ai-prose pre {
+  margin: 0.5em 0 0.8em;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--color-ink) 5%, var(--color-surface));
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+
+.ai-prose pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+.ai-prose blockquote {
+  margin: 0.4em 0 0.8em;
+  border-left: 3px solid var(--color-border-strong);
+  padding-left: 10px;
+  color: var(--color-tertiary);
+}
+
+.ai-prose strong {
+  font-weight: 650;
+}
+
+.ai-thinking {
+  color: var(--color-tertiary);
+  animation: ai-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ai-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.ai-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ai-composer .textarea {
+  resize: vertical;
+  min-height: 62px;
+}
+
+.ai-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.annotation-ai-hint-inline {
+  flex: 1;
+  color: var(--color-tertiary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.annotation-save-row {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+.ai-chat {
+  flex: 1;
+  min-height: 120px;
+  max-height: min(46vh, 420px);
+}
+
+/* 编辑格式工具栏：与提示条同风格的顶部悬浮胶囊，滚动时始终在手边 */
+.reader-edit-toolbar {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: min(620px, 92vw);
+  overflow-x: auto;
+  padding: 5px 10px;
+  border-radius: 14px;
+  background: #1c1526;
+  border: 1px solid #3a3352;
+  box-shadow: 0 10px 24px rgba(15, 10, 30, 0.35);
+  animation: edit-hint-in 260ms var(--ease-out-expo) both;
+  scrollbar-width: none;
+}
+
+.reader-edit-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.reader-edit-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 7px;
+  border-right: 1px solid #3a3352;
+}
+
+.reader-edit-toolbar__group:last-child {
+  padding-right: 0;
+  border-right: none;
+}
+
+.reader-edit-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #cbbcec;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.reader-edit-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+
+.reader-edit-toolbar button[data-active] {
+  background: #3a3352;
+  color: #fff;
+}
+
+.reader-edit-toolbar button svg {
+  width: 16px;
+  height: 16px;
+}

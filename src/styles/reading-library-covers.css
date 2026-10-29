@@ -1,0 +1,254 @@
+/* Reading library — cover-led archive */
+.book-cover--featured,
+.library-book-cover {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid color-mix(in oklab, currentColor 13%, var(--color-border));
+  border-radius: 3px 9px 9px 3px;
+  padding: 14px;
+  box-shadow:
+    inset 7px 0 0 color-mix(in oklab, currentColor 11%, transparent),
+    7px 10px 24px color-mix(in oklab, var(--color-primary) 9%, transparent);
+  transition:
+    transform 210ms var(--ease-out-expo),
+    box-shadow 210ms var(--ease-out-expo);
+}
+
+.book-cover--featured::after,
+.library-book-cover::after {
+  position: absolute;
+  inset: 0 12px 0 auto;
+  width: 1px;
+  background: color-mix(in oklab, currentColor 15%, transparent);
+  content: "";
+}
+
+.book-cover--tone-0 {
+  background: #eee7ff;
+  color: #4f269f;
+}
+.book-cover--tone-1 {
+  background: #e4f1ea;
+  color: #225e45;
+}
+.book-cover--tone-2 {
+  background: #f4ead8;
+  color: #795013;
+}
+.book-cover--tone-3 {
+  background: #e8ebf3;
+  color: #37415c;
+}
+
+.book-cover.book-cover--featured {
+  width: 110px;
+  height: 144px;
+  background-color: inherit;
+  padding: 14px;
+}
+
+.book-cover--featured span,
+.book-cover--featured small,
+.library-book-cover span,
+.library-book-cover small {
+  position: relative;
+  z-index: 1;
+  color: currentColor;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.book-cover.book-cover--featured strong,
+.library-book-cover strong {
+  position: relative;
+  z-index: 1;
+  display: -webkit-box;
+  overflow: hidden;
+  margin: auto 8px auto 0;
+  color: currentColor;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-wrap: balance;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.book-cover.book-cover--featured strong {
+  font-size: 18px;
+}
+
+.current-reading {
+  grid-template-columns: 110px 1fr auto;
+  min-height: 182px;
+  padding: 18px 20px;
+}
+
+.reading-library-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.reading-library-heading > span {
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.book-card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 198px 1fr;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: 10px;
+  transition:
+    transform 210ms var(--ease-out-expo),
+    border-color 210ms ease,
+    box-shadow 210ms ease;
+}
+
+.book-card::after {
+  position: absolute;
+  top: -1px;
+  left: 16px;
+  width: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--color-accent-amber);
+  content: "";
+  transition: width 260ms var(--ease-out-expo);
+}
+
+.book-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(
+    in oklab,
+    var(--color-accent-purple) 44%,
+    var(--color-border)
+  );
+  box-shadow: 0 16px 34px
+    color-mix(in oklab, var(--color-primary) 10%, transparent);
+}
+
+.book-card:hover::after,
+.book-card:focus-visible::after {
+  width: 54px;
+}
+
+.book-card:active {
+  transform: translateY(-1px) scale(0.992);
+}
+
+.library-book-cover {
+  min-height: 198px;
+}
+
+.library-book-cover strong {
+  font-size: 20px;
+  -webkit-line-clamp: 3;
+}
+
+.book-card:hover .library-book-cover {
+  transform: perspective(620px) rotateY(-2.5deg) translateX(2px);
+  box-shadow:
+    inset 7px 0 0 color-mix(in oklab, currentColor 11%, transparent),
+    10px 13px 25px color-mix(in oklab, var(--color-primary) 13%, transparent);
+}
+
+.book-card-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 14px 4px 4px;
+}
+
+.book-card-copy time {
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.book-card-copy h3 {
+  display: -webkit-box;
+  overflow: hidden;
+  min-height: 47px;
+  margin: 7px 20px 10px 0;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.book-card-copy .progress-track {
+  margin-top: auto;
+}
+
+.book-card-arrow {
+  position: absolute;
+  right: 15px;
+  bottom: 56px;
+  width: 14px;
+  color: var(--color-tertiary);
+  transition:
+    transform 180ms var(--ease-out-expo),
+    color 180ms ease;
+}
+
+.book-card:hover .book-card-arrow {
+  transform: translateX(3px);
+  color: var(--color-accent-purple);
+}
+
+.book-card-skeleton {
+  min-height: 340px;
+}
+
+.reading-pagination,
+.library-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.reading-pagination > span,
+.library-pagination > span {
+  min-width: 70px;
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+.reading-pagination strong,
+.library-pagination strong {
+  color: var(--color-accent-purple-dark);
+  font-size: 12px;
+}
+
+.reading-pagination button:disabled,
+.library-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}

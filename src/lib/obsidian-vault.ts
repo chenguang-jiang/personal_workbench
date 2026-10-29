@@ -4,7 +4,7 @@ import matter from "gray-matter";
 import { prisma } from "@/lib/prisma";
 import { getVaultConfig, isIgnoredVaultPath } from "@/lib/obsidian-sync";
 
-const DEFAULT_FOLDERS = ["00-Inbox", "阅读资料", "知识笔记"];
+export const DEFAULT_FOLDERS = ["00-Inbox", "阅读资料", "知识笔记"];
 
 export type VaultFolder = {
   name: string;
@@ -46,7 +46,8 @@ export function resolveVaultPath(relativePath = "") {
   if (!config.available) throw new Error("配置的 Obsidian Vault 不存在");
 
   const cleanPath = relativePath.replaceAll("\\", "/").replace(/^\/+|\/+$/g, "");
-  if (cleanPath.split("/").some((part) => part === ".." || part === ".")) {
+  // 拒绝 . / .. 以及任何以 "." 开头的段（.obsidian、.git 等隐藏目录不可读写）
+  if (cleanPath.split("/").some((part) => part.startsWith("."))) {
     throw new Error("无效的 Vault 路径");
   }
 
@@ -101,26 +102,82 @@ function summarizeMarkdown(content: string) {
     .join("");
 }
 
-export function listVaultFolders() {
-  const { vaultPath } = resolveVaultPath();
-  ensureDefaultFolders(vaultPath);
+// 文件夹统计缓存：完整遍历 vault 代价高，短 TTL + 监听器变更时主动失效
+const FOLDER_CACHE_TTL_MS = 30_000;
+
+type FolderCache = { vaultPath: string; folders: VaultFolder[]; expiresAt: number };
+
+// 挂到 globalThis：instrumentation（监听器）与路由可能处于不同模块实例，需共享同一份缓存
+const globalForVaultFolders = globalThis as typeof globalThis & {
+  __dawnkbVaultFolderCache?: FolderCache | null;
+};
+
+/** vault 内容变化时由监听器调用，下次读取重新遍历 */
+export function invalidateVaultFolderCache() {
+  globalForVaultFolders.__dawnkbVaultFolderCache = null;
+}
+
+// 单次自底向上遍历：每个目录只读一次，子树统计向上汇总（原实现对每层都重新递归整棵子树）
+function scanVaultFolders(vaultPath: string) {
   const folders: VaultFolder[] = [];
 
-  function walk(directory: string) {
+  function walk(directory: string): Omit<VaultFolder, "name" | "path"> {
+    let fileCount = 0;
+    let directFileCount = 0;
+    let childFolderCount = 0;
+    let updatedAt = 0;
     for (const entry of visibleEntries(directory)) {
-      if (!entry.isDirectory()) continue;
       const fullPath = path.join(directory, entry.name);
-      const relativePath = path.relative(vaultPath, fullPath).split(path.sep).join("/");
-      folders.push({ name: entry.name, path: relativePath, ...folderStats(fullPath) });
-      walk(fullPath);
+      if (entry.isDirectory()) {
+        childFolderCount += 1;
+        const child = walk(fullPath);
+        const relativePath = path.relative(vaultPath, fullPath).split(path.sep).join("/");
+        folders.push({ name: entry.name, path: relativePath, ...child });
+        fileCount += child.fileCount;
+        if (child.updatedAt) updatedAt = Math.max(updatedAt, new Date(child.updatedAt).getTime());
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) continue;
+      fileCount += 1;
+      directFileCount += 1;
+      try {
+        updatedAt = Math.max(updatedAt, fs.statSync(fullPath).mtimeMs);
+      } catch {
+        // 遍历期间文件被删除：计数保留，忽略时间
+      }
     }
+    return {
+      fileCount,
+      directFileCount,
+      childFolderCount,
+      updatedAt: updatedAt ? new Date(updatedAt).toISOString() : null,
+    };
   }
 
   walk(vaultPath);
   return folders.sort((left, right) => left.path.localeCompare(right.path, "zh-CN"));
 }
 
-export async function getVaultLibrary(relativeFolder = "") {
+export function listVaultFolders(): VaultFolder[] {
+  const { vaultPath } = resolveVaultPath();
+  const cached = globalForVaultFolders.__dawnkbVaultFolderCache;
+  if (cached && cached.vaultPath === vaultPath && cached.expiresAt > Date.now()) {
+    return cached.folders;
+  }
+  ensureDefaultFolders(vaultPath);
+  const folders = scanVaultFolders(vaultPath);
+  globalForVaultFolders.__dawnkbVaultFolderCache = {
+    vaultPath,
+    folders,
+    expiresAt: Date.now() + FOLDER_CACHE_TTL_MS,
+  };
+  return folders;
+}
+
+export async function getVaultLibrary(
+  relativeFolder = "",
+  options: { includeAllFolders?: boolean } = {},
+) {
   const resolved = resolveVaultPath(relativeFolder);
   ensureDefaultFolders(resolved.vaultPath);
   if (!fs.existsSync(resolved.absolutePath) || !fs.statSync(resolved.absolutePath).isDirectory()) {
@@ -128,12 +185,15 @@ export async function getVaultLibrary(relativeFolder = "") {
   }
 
   const entries = visibleEntries(resolved.absolutePath);
+  // 子文件夹统计直接取缓存的全量遍历结果，缓存未命中时才单独统计
+  const allFolders = listVaultFolders();
+  const statsByPath = new Map(allFolders.map((folder) => [folder.path, folder]));
   const folders = entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => {
       const fullPath = path.join(resolved.absolutePath, entry.name);
       const relativePath = path.relative(resolved.vaultPath, fullPath).split(path.sep).join("/");
-      return { name: entry.name, path: relativePath, ...folderStats(fullPath) };
+      return statsByPath.get(relativePath) ?? { name: entry.name, path: relativePath, ...folderStats(fullPath) };
     })
     .sort((left, right) => left.name.localeCompare(right.name, "zh-CN"));
 
@@ -190,6 +250,7 @@ export async function getVaultLibrary(relativeFolder = "") {
     breadcrumbs,
     folders,
     files,
-    allFolders: listVaultFolders(),
+    // 全量文件夹列表仅在调用方明确需要时返回，切换文件夹时不必重复传输
+    ...(options.includeAllFolders ? { allFolders } : {}),
   };
 }

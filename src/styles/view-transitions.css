@@ -1,0 +1,42 @@
+/* Reading continuity — the selected book becomes the document heading. */
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-group(.document-morph) {
+  z-index: var(--z-dialog);
+  animation-duration: 620ms;
+  animation-timing-function: var(--ease-out-expo);
+}
+
+::view-transition-image-pair(.document-morph) {
+  overflow: clip;
+  border-radius: 14px;
+  isolation: auto;
+}
+
+::view-transition-old(.document-morph) {
+  animation: document-card-old 430ms ease-out both;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(.document-morph) {
+  animation: document-card-new 580ms var(--ease-out-expo) both;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(.document-forward) {
+  animation: document-forward-old 190ms ease-out both;
+}
+
+::view-transition-new(.document-forward) {
+  animation: document-forward-new 430ms var(--ease-out-expo) 40ms both;
+}
+
+::view-transition-old(.document-back) {
+  animation: document-back-old 180ms ease-out both;
+}
+
+::view-transition-new(.document-back) {
+  animation: document-back-new 390ms var(--ease-out-expo) 30ms both;
+}

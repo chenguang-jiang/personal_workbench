@@ -3,10 +3,15 @@ import {
   deleteObsidianFile,
   getVaultConfig,
   isIgnoredVaultPath,
+  rebuildKnowledgeRelations,
   syncObsidianFile,
   syncObsidianVault,
   type VaultSyncSummary,
 } from "@/lib/obsidian-sync";
+import { invalidateVaultFolderCache } from "@/lib/obsidian-vault";
+
+// 新增/删除/改名后完整重建关系的防抖窗口（尾触发）
+const RELATION_REBUILD_DEBOUNCE_MS = 2000;
 
 export type VaultWatcherState = "disabled" | "missing" | "starting" | "syncing" | "ready" | "error";
 
@@ -28,6 +33,11 @@ class VaultWatcher {
   private lastEvent: string | null = null;
   private error: string | null = null;
   private syncPromise: Promise<VaultSyncSummary> | null = null;
+  // 以下字段不带初始化器：热更新时旧实例只换原型、不重跑构造函数，需按需惰性创建
+  private pathQueues?: Map<string, Promise<void>>;
+  private rebuildTimer?: ReturnType<typeof setTimeout> | null;
+  private rebuildPromise?: Promise<void> | null;
+  private rebuildPending?: boolean;
 
   start() {
     if (this.watcher) return;
@@ -61,6 +71,8 @@ class VaultWatcher {
       .on("add", (filePath) => void this.handleChange(filePath, "新增"))
       .on("change", (filePath) => void this.handleChange(filePath, "更新"))
       .on("unlink", (filePath) => void this.handleDelete(filePath))
+      .on("addDir", () => invalidateVaultFolderCache())
+      .on("unlinkDir", () => invalidateVaultFolderCache())
       .on("error", (watchError) => {
         this.state = "error";
         this.error = watchError instanceof Error ? watchError.message : String(watchError);
@@ -109,40 +121,100 @@ class VaultWatcher {
     return this.syncPromise;
   }
 
-  private async handleChange(filePath: string, event: string) {
-    if (!filePath.endsWith(".md")) return;
-    try {
-      const result = await syncObsidianFile(filePath);
-      if (result.status === "skipped") return;
-      this.state = "ready";
-      this.lastSyncAt = new Date().toISOString();
-      this.lastEvent = `${event}：${result.title}`;
-      this.error = null;
-      console.log(`[VaultWatcher] ${this.lastEvent}`);
-    } catch (syncError) {
-      this.state = "error";
-      this.error = syncError instanceof Error ? syncError.message : String(syncError);
-      console.error(`[VaultWatcher] 同步失败 ${filePath}:`, syncError);
-    }
+  // 同一路径的事件串行处理，避免快速连续保存时读写交错
+  private enqueue(filePath: string, task: () => Promise<void>) {
+    const queues = (this.pathQueues ??= new Map());
+    const previous = queues.get(filePath) ?? Promise.resolve();
+    const next = previous.then(task, task);
+    queues.set(filePath, next);
+    void next.finally(() => {
+      if (queues.get(filePath) === next) queues.delete(filePath);
+    });
+    return next;
   }
 
-  private async handleDelete(filePath: string) {
-    try {
-      const deleted = await deleteObsidianFile(filePath);
-      if (!deleted) return;
-      this.state = "ready";
-      this.lastSyncAt = new Date().toISOString();
-      this.lastEvent = `删除：${filePath.split("/").pop()}`;
-      this.error = null;
-      console.log(`[VaultWatcher] ${this.lastEvent}`);
-    } catch (deleteError) {
-      this.state = "error";
-      this.error = deleteError instanceof Error ? deleteError.message : String(deleteError);
-      console.error(`[VaultWatcher] 删除同步失败 ${filePath}:`, deleteError);
+  // 尾触发防抖 + 单飞：窗口内多次新增/删除只重建一次；重建进行中再有请求则结束后补一次
+  private scheduleRelationRebuild() {
+    if (this.rebuildTimer) clearTimeout(this.rebuildTimer);
+    this.rebuildTimer = setTimeout(() => {
+      this.rebuildTimer = null;
+      void this.runRelationRebuild();
+    }, RELATION_REBUILD_DEBOUNCE_MS);
+  }
+
+  private async runRelationRebuild() {
+    if (this.rebuildPromise) {
+      this.rebuildPending = true;
+      return this.rebuildPromise;
     }
+    this.rebuildPromise = rebuildKnowledgeRelations()
+      .then(() => undefined)
+      .catch((rebuildError) => {
+        this.error = rebuildError instanceof Error ? rebuildError.message : String(rebuildError);
+        console.error("[VaultWatcher] 关系重建失败:", rebuildError);
+      })
+      .finally(() => {
+        this.rebuildPromise = null;
+        if (this.rebuildPending) {
+          this.rebuildPending = false;
+          this.scheduleRelationRebuild();
+        }
+      });
+    return this.rebuildPromise;
+  }
+
+  private handleChange(filePath: string, event: string) {
+    if (!filePath.endsWith(".md")) return Promise.resolve();
+    invalidateVaultFolderCache();
+    const isAdd = event === "新增";
+    return this.enqueue(filePath, async () => {
+      try {
+        // 新增：不在单文件里重建关系，统一走防抖的完整重建；更新：只重算本文件出边
+        const result = await syncObsidianFile(
+          filePath,
+          isAdd ? { rebuildRelations: false } : { relationScope: "node" },
+        );
+        if (result.status === "skipped") return;
+        if (isAdd || result.status === "created" || result.titleChanged) {
+          this.scheduleRelationRebuild();
+        }
+        this.state = "ready";
+        this.lastSyncAt = new Date().toISOString();
+        this.lastEvent = `${event}：${result.title}`;
+        this.error = null;
+        console.log(`[VaultWatcher] ${this.lastEvent}`);
+      } catch (syncError) {
+        this.state = "error";
+        this.error = syncError instanceof Error ? syncError.message : String(syncError);
+        console.error(`[VaultWatcher] 同步失败 ${filePath}:`, syncError);
+      }
+    });
+  }
+
+  private handleDelete(filePath: string) {
+    invalidateVaultFolderCache();
+    return this.enqueue(filePath, async () => {
+      try {
+        const deleted = await deleteObsidianFile(filePath);
+        if (!deleted) return;
+        // 删除节点会级联删边；其他文件的同名链接可能改指向别的节点，需完整重建
+        this.scheduleRelationRebuild();
+        this.state = "ready";
+        this.lastSyncAt = new Date().toISOString();
+        this.lastEvent = `删除：${filePath.split("/").pop()}`;
+        this.error = null;
+        console.log(`[VaultWatcher] ${this.lastEvent}`);
+      } catch (deleteError) {
+        this.state = "error";
+        this.error = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        console.error(`[VaultWatcher] 删除同步失败 ${filePath}:`, deleteError);
+      }
+    });
   }
 
   async stop() {
+    if (this.rebuildTimer) clearTimeout(this.rebuildTimer);
+    this.rebuildTimer = null;
     await this.watcher?.close();
     this.watcher = null;
     this.state = "disabled";

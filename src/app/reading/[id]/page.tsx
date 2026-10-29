@@ -1,6 +1,7 @@
 import { Reader } from "@/components/reading/Reader";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import { isCloudMode } from "@/lib/cloud/config";
 
 export default async function ReadingPage({
   params,
@@ -11,6 +12,7 @@ export default async function ReadingPage({
     citationSession?: string | string[];
     citationId?: string | string[];
     messageIndex?: string | string[];
+    edit?: string | string[];
   }>;
 }) {
   const { id } = await params;
@@ -65,12 +67,18 @@ export default async function ReadingPage({
     }
   }
 
+  // ?edit=1：书架「新建文章」落地即进编辑态
+  const initialEditing = query.edit === "1";
+
   return (
     <Reader
+      readOnly={isCloudMode()}
       articleId={id}
+      initialEditing={initialEditing}
       initialCitation={initialCitation}
       initialArticle={{
         id: article.id,
+        contentVersion: article.contentVersion,
         title: article.title,
         content: article.content || "",
         tags: article.tags,
@@ -78,11 +86,13 @@ export default async function ReadingPage({
         url: article.url,
         updatedAt: article.updatedAt.toISOString(),
         readingProgress: article.readingProgress,
+        favoritedAt: article.favoritedAt?.toISOString() ?? null,
         highlights: article.highlights.map((highlight) => ({
           id: highlight.id,
           text: highlight.text,
           color: highlight.color,
           note: highlight.note,
+          prefix: highlight.prefix,
           createdAt: highlight.createdAt.toISOString(),
         })),
         notes: article.notes.map((note) => ({

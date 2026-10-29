@@ -1,0 +1,147 @@
+/* ── 每日热点 TOP 10 ── */
+.hot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+  list-style: none;
+  padding: 0;
+}
+
+.hot-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-elevated);
+  padding: 14px 18px;
+  transition:
+    border-color 150ms ease,
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.hot-row:hover {
+  border-color: var(--color-border-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(20, 12, 40, 0.08);
+}
+
+.hot-rank {
+  flex: none;
+  width: 40px;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-tertiary);
+}
+
+.hot-rank--top1 {
+  color: var(--color-danger);
+}
+.hot-rank--top2 {
+  color: #e07a2a;
+}
+.hot-rank--top3 {
+  color: #d9a514;
+}
+
+.hot-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.hot-row-title-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hot-row-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hot-row-title svg {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-left: 4px;
+  vertical-align: -2px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.hot-row:hover .hot-row-title svg {
+  opacity: 0.7;
+}
+
+.hot-row-status {
+  flex: none;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-accent-green) 14%, transparent);
+  color: color-mix(
+    in oklab,
+    var(--color-accent-green) 70%,
+    var(--color-primary)
+  );
+  font-size: 12px;
+  padding: 2px 9px;
+}
+
+.hot-row-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--color-tertiary);
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hot-row-heat {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--color-danger) 30%, var(--color-border));
+  color: var(--color-danger);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 10px;
+}
+
+.hot-row-heat svg {
+  width: 11px;
+  height: 11px;
+}
+
+.hot-row--skeleton .skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--color-border) 60%, transparent);
+  margin: 4px 0;
+  animation: ai-pulse 1.4s ease-in-out infinite;
+}
+
+.hot-row--skeleton .skeleton-line--short {
+  width: 46%;
+}
+
+.hot-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 16px 20px;
+  color: #b3261e;
+}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 // DELETE /api/highlights/[id]
 export async function DELETE(
@@ -17,7 +18,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const body = await req.json();
+  const body = await readJsonObject<{ note?: string | null; color?: string }>(req);
+  if (!body) return invalidJsonResponse();
 
   const highlight = await prisma.highlight.update({
     where: { id },

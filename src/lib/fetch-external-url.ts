@@ -8,13 +8,53 @@
  * 4. 带缓存避免重复抓取（30 分钟 TTL）
  */
 
+import { execFile } from "node:child_process";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
+
 const cache = new Map<string, { content: string; timestamp: number }>();
 const CACHE_TTL = 30 * 60 * 1000; // 30 分钟
+const MAX_REDIRECTS = 3;
+
+// URL 来自文章正文（不可信）：只允许公网 http(s)，挡住 localhost / 内网 / 云元数据地址（SSRF）
+function isPrivateAddress(address: string): boolean {
+  if (isIP(address) === 6) {
+    const lower = address.toLowerCase();
+    if (lower === "::1" || lower === "::") return true;
+    if (lower.startsWith("::ffff:")) return isPrivateAddress(lower.slice(7));
+    return /^(fc|fd|fe8|fe9|fea|feb)/.test(lower);
+  }
+  const [a, b] = address.split(".").map(Number);
+  return (
+    a === 0 || a === 10 || a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    a >= 224
+  );
+}
+
+async function assertPublicHttpUrl(raw: string): Promise<URL> {
+  const url = new URL(raw);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`unsupported protocol: ${url.protocol}`);
+  }
+  const host = url.hostname.replace(/^\[|\]$/g, "");
+  const addresses = isIP(host) ? [host] : (await lookup(host, { all: true })).map((r) => r.address);
+  if (addresses.length === 0 || addresses.some(isPrivateAddress)) {
+    throw new Error(`blocked non-public host: ${host}`);
+  }
+  return url;
+}
 
 /** 从 HTML 中提取纯文本 */
 function extractTextFromHtml(html: string): string {
   // 去掉 script/style 标签
-  let text = html
+  const text = html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
     .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "")
@@ -42,21 +82,30 @@ function extractTextFromHtml(html: string): string {
   return text.slice(0, 12000);
 }
 
-/** 尝试直接 fetch 一个 URL */
+/** 尝试直接 fetch 一个 URL（手动跟随重定向，每一跳都做公网校验） */
 async function tryFetchDirect(url: string): Promise<string | null> {
   try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(12000),
-      headers: {
-        "User-Agent": "DawnKB/1.0 (knowledge-fetcher)",
-        Accept: "text/html, text/plain, text/markdown, */*",
-      },
-    });
-    if (!res.ok) return null;
+    let target = await assertPublicHttpUrl(url);
+    let res: Response | null = null;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      res = await fetch(target, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(12000),
+        headers: {
+          "User-Agent": "DawnKB/1.0 (knowledge-fetcher)",
+          Accept: "text/html, text/plain, text/markdown, */*",
+        },
+      });
+      const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
+      if (!location) break;
+      target = await assertPublicHttpUrl(new URL(location, target).toString());
+      res = null;
+    }
+    if (!res?.ok) return null;
     const contentType = res.headers.get("content-type") || "";
     const text = await res.text();
 
-    if (contentType.includes("text/markdown") || url.endsWith(".md")) {
+    if (contentType.includes("text/markdown") || target.pathname.endsWith(".md")) {
       return text.slice(0, 12000);
     }
     if (contentType.includes("text/html") || text.includes("<!DOCTYPE") || text.includes("<html")) {
@@ -69,16 +118,16 @@ async function tryFetchDirect(url: string): Promise<string | null> {
   }
 }
 
-/** 尝试 defuddle 提取 */
+/** 尝试 defuddle 提取（execFile 传参数组，不经过 shell，URL 无法注入命令） */
 async function tryDefuddle(url: string): Promise<string | null> {
   try {
-    const { execSync } = await import("node:child_process");
-    const result = execSync(`defuddle parse "${url}" --md 2>/dev/null`, {
+    const safeUrl = await assertPublicHttpUrl(url);
+    const { stdout } = await execFileAsync("defuddle", ["parse", safeUrl.toString(), "--md"], {
       timeout: 15000,
       maxBuffer: 1024 * 1024,
       encoding: "utf-8",
     });
-    const trimmed = result.trim();
+    const trimmed = stdout.trim();
     return trimmed.length > 100 ? trimmed.slice(0, 12000) : null;
   } catch {
     return null;
@@ -113,10 +162,11 @@ async function tryNotionApi(url: string): Promise<string | null> {
     if (!blocks) return null;
     // 提取所有文本内容
     const texts: string[] = [];
-    for (const [, block] of Object.entries(blocks) as [string, any][]) {
+    type NotionBlock = { value?: { properties?: { title?: unknown } } };
+    for (const block of Object.values(blocks as Record<string, NotionBlock>)) {
       const title = block?.value?.properties?.title;
       if (title && Array.isArray(title)) {
-        const text = title.map((t: any) => t[0]).join("");
+        const text = title.map((segment: unknown) => (Array.isArray(segment) ? String(segment[0] ?? "") : "")).join("");
         if (text.trim()) texts.push(text);
       }
     }

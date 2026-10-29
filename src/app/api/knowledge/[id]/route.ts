@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 // GET /api/knowledge/[id] — 获取知识节点详情
 export async function GET(
@@ -31,7 +32,15 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const body = await req.json();
+  const body = await readJsonObject<{
+    title?: string;
+    description?: string | null;
+    content?: string | null;
+    type?: string;
+    tags?: string[];
+    parentId?: string | null;
+  }>(req);
+  if (!body) return invalidJsonResponse();
 
   const node = await prisma.knowledgeNode.update({
     where: { id },

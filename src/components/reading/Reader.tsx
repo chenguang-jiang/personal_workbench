@@ -1,19 +1,24 @@
 "use client";
 
 import {
+  memo,
   useCallback,
   useMemo,
   useState,
   useEffect,
   useRef,
   ViewTransition,
+  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { AnnotationDesk, type AnnotationTab } from "./AnnotationDesk";
+import { EditToolbar } from "./EditToolbar";
 import { HighlightToolbar, type SelectionPosition } from "./HighlightToolbar";
 import { MermaidDiagram } from "./MermaidDiagram";
+import { ReaderAiChat, type AiChatSelection } from "./ReaderAiChat";
 import {
   ArrowLeft,
+  BotMessageSquare,
   Check,
   CheckCircle2,
   Circle,
@@ -24,9 +29,10 @@ import {
   Minimize2,
   Pencil,
   Printer,
+  Share2,
   Sparkles,
+  Star,
   StickyNote,
-  Table,
   Trash2,
   Wand2,
   X,
@@ -34,9 +40,12 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/utils";
+import { renderMarkdown, splitMermaidBlocks, type RenderOptions } from "@/lib/reader-markdown";
 import { serializeProse } from "@/lib/serialize-markdown";
+import { useUiPrefs } from "@/lib/ui-prefs";
 import {
   injectTableToolbars,
+  insertMermaidAtSelection,
   insertTableAtSelection,
 } from "@/lib/table-edit";
 import {
@@ -48,6 +57,7 @@ import {
   optionsSignature,
 } from "@/lib/quiz-embed";
 import { DeleteDocumentDialog } from "./DeleteDocumentDialog";
+import { ShareDialog } from "./ShareDialog";
 import {
   ArticleOutline,
   ReaderTuner,
@@ -59,12 +69,7 @@ import {
   articleOrigin,
   articleStamp,
   extractArticleOutline,
-  headingIdFor,
-  normalizeTitle,
-  opensWithDocumentTitle,
   readingMinutes,
-  restoreOmittedTitle,
-  type HeadingState,
 } from "@/lib/article-outline";
 
 interface SiblingFile {
@@ -91,6 +96,7 @@ interface Note {
 }
 
 export interface ReaderArticle {
+  contentVersion: number;
   id: string;
   title: string;
   content: string;
@@ -100,6 +106,7 @@ export interface ReaderArticle {
   path?: string | null;
   updatedAt?: string;
   readingProgress: number;
+  favoritedAt?: string | null;
   highlights: Highlight[];
   notes: Note[];
 }
@@ -108,9 +115,14 @@ export function Reader({
   articleId,
   initialArticle,
   initialCitation,
+  initialEditing = false,
+  readOnly = false,
 }: {
+  readOnly?: boolean;
   articleId: string;
   initialArticle: ReaderArticle;
+  /** 打开即进入原位编辑态（书架「新建文章」跳转用） */
+  initialEditing?: boolean;
   initialCitation?: {
     id: string;
     quote: string;
@@ -119,7 +131,10 @@ export function Reader({
   } | null;
 }) {
   const [article, setArticle] = useState<ReaderArticle | null>(initialArticle);
-  const [loading, setLoading] = useState(false);
+  // 实时阅读进度（滚动时本地更新，节流写库）；打开文章时用它恢复上次位置
+  const [progress, setProgress] = useState(initialArticle.readingProgress);
+  // MarkdownArticle 每次重写正文 DOM（如链接解析回填）后自增，驱动高亮/批注标记重新挂载
+  const [renderTick, setRenderTick] = useState(0);
   const [selection, setSelection] = useState<SelectionPosition | null>(null);
   const [deskOpen, setDeskOpen] = useState(false);
   const [deskTab, setDeskTab] = useState<AnnotationTab>("note");
@@ -127,22 +142,31 @@ export function Reader({
     text: string;
     context: string;
   } | null>(null);
-  const [deskQuestion, setDeskQuestion] = useState("");
   const [deskRequestKey, setDeskRequestKey] = useState(0);
-  const [editing, setEditing] = useState(false);
+  // AI 对话面板：selection/question 只在打开瞬间取值，面板内部自成状态
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiChatSelection, setAiChatSelection] = useState<AiChatSelection>(null);
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiRequestKey, setAiRequestKey] = useState(0);
+  const [editing, setEditing] = useState(initialEditing);
   const [saving, setSaving] = useState(false);
   const [tidying, setTidying] = useState(false);
   const [undoContent, setUndoContent] = useState<string | null>(null);
   const [flashError, setFlashError] = useState(false);
   const [wide, setWide] = useState(false);
   const [mdCopied, setMdCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [siblings, setSiblings] = useState<SiblingFile[]>([]);
   const [siblingFolder, setSiblingFolder] = useState("");
   const [siblingsOpen, setSiblingsOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
   const [editNotice, setEditNotice] = useState<string | null>(null);
   const [editNoticeError, setEditNoticeError] = useState(false);
+  // 未保存修改（dirtyRef 的可见镜像，驱动提示条上的状态点）
+  const [dirty, setDirty] = useState(false);
   const router = useRouter();
+  // 插入流程图时按当前主题/强调色渲染，与阅读视图一致
+  const { theme, accent } = useUiPrefs();
   const { font, size, setFont, setSize } = useReaderPrefs();
   const [activeHeading, setActiveHeading] = useState("");
 
@@ -193,8 +217,8 @@ export function Reader({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "wrong", qIndex, on }),
-      });
-      if (!response.ok) {
+      }).catch(() => null);
+      if (!response?.ok) {
         setQuizWrong((current) =>
           on ? current.filter((i) => i !== qIndex) : [...current, qIndex],
         );
@@ -280,26 +304,26 @@ export function Reader({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
   const dirtyRef = useRef(false);
-  const editingRef = useRef(false);
+  const editingRef = useRef(initialEditing);
   const contentRef = useRef<HTMLDivElement>(null);
   const locatedCitationRef = useRef("");
 
-  // 加载文章
-  useEffect(() => {
-    async function load() {
-      const res = await fetch(`/api/articles/${articleId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setArticle(data);
-      }
-      setLoading(false);
-    }
-    load();
-  }, [articleId]);
-
   // 选中文本监听
   useEffect(() => {
+    let frame = 0;
+    function scheduleSelection() {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        handleSelection();
+      });
+    }
     function handleSelection() {
+      // 编辑态（contentEditable）下不弹选中浮窗，避免把高亮写进正在编辑的 DOM
+      if (editingRef.current) {
+        setSelection(null);
+        return;
+      }
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed) {
         setSelection(null);
@@ -345,43 +369,68 @@ export function Reader({
       });
     }
 
-    document.addEventListener("selectionchange", handleSelection);
-    return () =>
-      document.removeEventListener("selectionchange", handleSelection);
+    document.addEventListener("selectionchange", scheduleSelection);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("selectionchange", scheduleSelection);
+    };
   }, []);
 
-  // 阅读进度追踪（节流保存）
+  // 阅读进度追踪：滚动时本地更新进度条，停顿 1 秒后写库；卸载时清理定时器
   const progressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasArticle = Boolean(article);
   useEffect(() => {
-    if (!article) return;
-
     const scrollElement = contentRef.current;
-    if (!scrollElement) return;
+    if (!hasArticle || !scrollElement) return;
+    let frame = 0;
 
     function handleScroll() {
-      if (editingRef.current) return;
-      const element = contentRef.current;
-      if (!element) return;
-      const scrollHeight = element.scrollHeight - element.clientHeight;
-      const progress =
-        scrollHeight > 0 ? (element.scrollTop / scrollHeight) * 100 : 0;
-
-      if (progressTimer.current) clearTimeout(progressTimer.current);
-      progressTimer.current = setTimeout(() => {
-        fetch(`/api/articles/${articleId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            readingProgress: Math.round(progress),
-            lastReadAt: new Date().toISOString(),
-          }),
-        });
-      }, 1000);
+      if (editingRef.current || frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const element = contentRef.current;
+        if (!element) return;
+        const scrollHeight = element.scrollHeight - element.clientHeight;
+        const next =
+          scrollHeight > 0 ? Math.round((element.scrollTop / scrollHeight) * 100) : 0;
+        setProgress(next);
+        if (progressTimer.current) clearTimeout(progressTimer.current);
+        // 云端只读模式同样写进度（书架“接着读”依赖它）；只读限制的是正文编辑，接口侧会拦下其他字段
+        progressTimer.current = setTimeout(() => {
+          fetch(`/api/articles/${articleId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              readingProgress: next,
+              lastReadAt: new Date().toISOString(),
+            }),
+          }).catch(() => undefined); // 进度属于尽力而为，失败不打扰阅读
+        }, 1000);
+      });
     }
 
     scrollElement.addEventListener("scroll", handleScroll, { passive: true });
-    return () => scrollElement.removeEventListener("scroll", handleScroll);
-  }, [article, articleId]);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (progressTimer.current) clearTimeout(progressTimer.current);
+      scrollElement.removeEventListener("scroll", handleScroll);
+    };
+  }, [hasArticle, articleId]);
+
+  // 打开文章时回到上次读到的位置（来自知识库引用定位时以引用为准）
+  const restoredProgressRef = useRef(false);
+  useEffect(() => {
+    if (restoredProgressRef.current || initialCitation?.quote) return;
+    restoredProgressRef.current = true;
+    const startAt = initialArticle.readingProgress;
+    if (startAt < RESTORE_PROGRESS_MIN || startAt > RESTORE_PROGRESS_MAX) return;
+    const frame = window.requestAnimationFrame(() => {
+      const element = contentRef.current;
+      if (!element) return;
+      element.scrollTop = ((element.scrollHeight - element.clientHeight) * startAt) / 100;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialArticle.readingProgress, initialCitation?.quote]);
 
   // 高亮选中文本（保存位置信息：前后文锚点 + 字符偏移量）
   async function applyHighlight(text: string, color: string) {
@@ -395,12 +444,14 @@ export function Reader({
 
     // 计算位置信息：前后文锚点 + 字符偏移量（以正文为基准，与回标恢复一致）
     const fullText = prose.textContent || "";
-    const selStart = getTextOffset(prose, range);
+    const rawStart = getTextOffset(prose, range);
+    const rawEnd = getTextOffset(prose, range, "end");
+    // text 已 trim：把起止收缩到真实可见文字上，避免包裹偏移
+    const raw = fullText.substring(rawStart, rawEnd);
+    const selStart = rawStart + (raw.length - raw.trimStart().length);
+    const selEnd = rawEnd - (raw.length - raw.trimEnd().length);
     const prefix = fullText.substring(Math.max(0, selStart - 50), selStart);
-    const suffix = fullText.substring(
-      selStart + text.length,
-      Math.min(fullText.length, selStart + text.length + 50),
-    );
+    const suffix = fullText.substring(selEnd, Math.min(fullText.length, selEnd + 50));
 
     // 安全包裹：按文本节点分段包裹，绝不做跨元素手术
     const walker = document.createTreeWalker(prose, NodeFilter.SHOW_TEXT);
@@ -409,42 +460,45 @@ export function Reader({
       const node = walker.currentNode as Text;
       if (node.nodeValue) nodes.push(node);
     }
-    wrapOffsets(nodes, selStart, selStart + text.length, () => {
-      const span = document.createElement("span");
-      span.style.background = HIGHLIGHT_BG[color] || HIGHLIGHT_BG.yellow;
-      span.style.borderRadius = "2px";
-      span.style.padding = "0 2px";
-      span.style.cursor = "pointer";
-      span.className = "highlight-mark";
-      span.dataset.color = color;
+    const pending: HTMLElement[] = [];
+    wrapOffsets(nodes, selStart, selEnd, () => {
+      const span = createHighlightSpan(color);
+      span.dataset.pending = "true";
+      pending.push(span);
       return span;
     });
     window.getSelection()?.removeAllRanges();
+    setSelection(null);
 
-    // 保存到数据库（含位置信息）
-    const response = await fetch("/api/highlights", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text,
-        color,
-        articleId,
-        prefix,
-        suffix,
-        startOffset: selStart,
-        endOffset: selStart + text.length,
-      }),
-    });
-    if (response.ok) {
+    // 保存到数据库（含位置信息）；失败则撤掉乐观标记并提示
+    try {
+      const response = await fetch("/api/highlights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: fullText.substring(selStart, selEnd),
+          color,
+          articleId,
+          prefix,
+          suffix,
+          startOffset: selStart,
+          endOffset: selEnd,
+        }),
+      });
+      if (!response.ok) throw new Error("highlight-failed");
       const highlight = await response.json();
+      pending.forEach((span) => delete span.dataset.pending);
       setArticle((current) =>
         current
           ? { ...current, highlights: [...current.highlights, highlight] }
           : current,
       );
+    } catch {
+      pending.forEach((span) => span.replaceWith(...Array.from(span.childNodes)));
+      prose.normalize();
+      setFlashError(true);
+      setSavedFlash("高亮没有保存成功，请重试");
     }
-
-    setSelection(null);
   }
 
   // 一键整理格式：AI 整理排版 → 走 PATCH 保存（vault 文章同步写回）→ 可撤销
@@ -482,7 +536,6 @@ export function Reader({
   async function undoTidy() {
     if (!article || !undoContent) return;
     const previous = undoContent;
-    setUndoContent(null);
     try {
       const patch = await fetch(`/api/articles/${articleId}`, {
         method: "PATCH",
@@ -490,42 +543,152 @@ export function Reader({
         body: JSON.stringify({ content: previous }),
       });
       if (!patch.ok) throw new Error("撤销失败");
+      setUndoContent(null);
       setArticle((current) =>
         current ? { ...current, content: previous } : current,
       );
       setFlashError(false);
-      setSavedFlash("已撤销整理");
+      setSavedFlash("已撤销修改");
     } catch (error) {
       setFlashError(true);
       setSavedFlash(error instanceof Error ? error.message : "撤销失败");
     }
   }
 
-  function openDesk(
-    tab: AnnotationTab,
-    text = "",
-    context = "",
-    question = "",
-  ) {
+  // 收藏切换：乐观更新，失败回滚
+  async function toggleFavorite() {
+    if (!article) return;
+    const previous = article.favoritedAt ?? null;
+    setArticle((current) =>
+      current
+        ? {
+            ...current,
+            favoritedAt: previous ? null : new Date().toISOString(),
+          }
+        : current,
+    );
+    try {
+      const response = await fetch(`/api/articles/${articleId}/favorite`, {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error("favorite-failed");
+      const data = await response.json();
+      setArticle((current) =>
+        current ? { ...current, favoritedAt: data.favoritedAt } : current,
+      );
+      setFlashError(false);
+      setSavedFlash(data.favorited ? "已加入收藏夹" : "已从收藏夹移除");
+    } catch {
+      setArticle((current) => ({ ...current!, favoritedAt: previous }));
+      setFlashError(true);
+      setSavedFlash("收藏状态没有保存成功，请重试");
+    }
+  }
+
+  function openDesk(tab: AnnotationTab, text = "", context = "") {
     setDeskTab(tab);
     setDeskSelection(text ? { text, context } : null);
-    setDeskQuestion(question);
     setDeskRequestKey((value) => value + 1);
     setDeskOpen(true);
     setSelection(null);
   }
 
-  function handleDawnAgent(text: string, context: string) {
-    openDesk("agent", text, context);
-  }
+  // 点击高亮/批注标记：打开标注台并以该段文字为当前选择（稳定引用，避免正文重渲染）
+  const handleMarkClick = useCallback((text: string) => {
+    setDeskTab("note");
+    setDeskSelection(text ? { text, context: "" } : null);
+    setDeskRequestKey((value) => value + 1);
+    setDeskOpen(true);
+    setSelection(null);
+  }, []);
+
+  const handleArticleRendered = useCallback(() => {
+    setRenderTick((tick) => tick + 1);
+  }, []);
 
   function handleSummarize() {
-    openDesk(
-      "agent",
+    openAiChat(
       "",
       "",
       "请概括全文的核心观点，指出需要验证的前提，并给出三个可执行的下一步。",
     );
+  }
+
+  // AI 对话：selection/question 只在打开瞬间传入，面板内部自成会话状态
+  function openAiChat(text = "", context = "", question = "") {
+    setAiChatSelection(text ? { text, context } : null);
+    setAiQuestion(question);
+    setAiRequestKey((value) => value + 1);
+    setAiOpen(true);
+    setSelection(null);
+    // 清掉原生选区：否则下一次 selectionchange 会让选区工具条再弹出来
+    window.getSelection()?.removeAllRanges();
+  }
+
+  // 应用 AI 修改稿：走 PATCH 保存（vault 文章同步写回），旧文存入撤销快照
+  async function applyAiEdit(content: string) {
+    if (!article) return;
+    const previous = article.content;
+    const response = await fetch(`/api/articles/${articleId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (!response.ok) throw new Error("保存 AI 修改失败");
+    setUndoContent(previous);
+    setArticle((current) =>
+      current ? { ...current, content } : current,
+    );
+    setFlashError(false);
+    setSavedFlash("AI 修改已应用");
+  }
+
+  // 选中加粗：把渲染选区映射回 Markdown 源码，包裹 ** 后保存（可撤销）
+  async function applyBold() {
+    if (!article || editing) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const prose =
+      contentRef.current?.querySelector<HTMLElement>(".reader-prose");
+    if (!prose || !prose.contains(range.commonAncestorContainer)) return;
+
+    // 代码块/表格/图表/链接里加粗会破坏结构，直接拒绝
+    const anchorEl =
+      range.commonAncestorContainer instanceof Element
+        ? range.commonAncestorContainer
+        : range.commonAncestorContainer.parentElement;
+    if (anchorEl?.closest("pre, code, table, .mermaid-diagram, a, mark")) {
+      setFlashError(true);
+      setSavedFlash("代码块、表格和链接里不支持加粗");
+      return;
+    }
+
+    const fullText = prose.textContent ?? "";
+    const rawStart = getTextOffset(prose, range);
+    const rawEnd = getTextOffset(prose, range, "end");
+    const selected = fullText.slice(rawStart, rawEnd).trim();
+    if (!selected) return;
+
+    const next = boldInSource(article.content, selected);
+    if (!next) {
+      setFlashError(true);
+      setSavedFlash("未能在原文中定位选中的文字，试着选短一点");
+      return;
+    }
+    window.getSelection()?.removeAllRanges();
+    setSelection(null);
+    try {
+      await applyAiEdit(next.content);
+      setSavedFlash(next.unbolded ? "已取消加粗" : "已加粗并保存");
+    } catch (error) {
+      setFlashError(true);
+      setSavedFlash(error instanceof Error ? error.message : "加粗保存失败");
+    }
+  }
+
+  function handleAskAi(text: string, context: string) {
+    openAiChat(text, context);
   }
 
   function handleNote(text: string, context: string) {
@@ -538,13 +701,17 @@ export function Reader({
 
   function startEdit() {
     if (!article) return;
+    // 手动编辑后旧的“撤销整理”快照已失效，继续保留会把手动修改一并覆盖
+    setUndoContent(null);
     dirtyRef.current = false;
+    setDirty(false);
     setSaveError(null);
     setSavedFlash(null);
     setEditing(true);
     editingRef.current = true;
     setSelection(null);
     setDeskOpen(false);
+    setAiOpen(false);
   }
 
   const cancelEdit = useCallback(() => {
@@ -558,6 +725,7 @@ export function Reader({
     if (dirtyRef.current && !window.confirm("有未保存的修改，确定放弃吗？"))
       return;
     dirtyRef.current = false;
+    setDirty(false);
     cancelEdit();
   }, [cancelEdit]);
 
@@ -577,30 +745,27 @@ export function Reader({
     setSaving(true);
     setSaveError(null);
     try {
-      const markdown = restoreOmittedTitle(
-        serializeProse(prose),
-        article.title,
-        article.content ?? "",
-      );
-      const response = await fetch(`/api/articles/${articleId}`, {
-        method: "PATCH",
+      const markdown = serializeProse(prose);
+      const response = await fetch(readOnly ? "/api/knowledge/edit" : `/api/articles/${articleId}`, {
+        method: readOnly ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: markdown }),
+        body: JSON.stringify({ ...(readOnly ? { articleId, contentVersion: article.contentVersion } : {}), content: markdown }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
         throw new Error(payload?.error || "保存失败");
       }
-      const fresh = await fetch(`/api/articles/${articleId}`).then((res) =>
-        res.json(),
-      );
+      const freshResponse = await fetch(`/api/articles/${articleId}`);
+      if (!freshResponse.ok) throw new Error("已保存，但重新加载失败，请刷新页面");
+      const fresh = await freshResponse.json();
       setArticle(fresh);
       dirtyRef.current = false;
+      setDirty(false);
       setEditing(false);
       editingRef.current = false;
       setSavedFlash(
         fresh.url?.startsWith("obsidian://")
-          ? "已保存 · 已写回 Obsidian Vault"
+          ? readOnly ? "已保存到云端 · 旧版已备份" : "已保存 · 已写回 Obsidian Vault"
           : "已保存",
       );
     } catch (error) {
@@ -611,8 +776,22 @@ export function Reader({
     }
   }
 
+  // 用 ref 持有最新的 finishEdit，⌘/Ctrl+S 保存时不必让键盘监听随每次渲染重挂
+  const finishEditRef = useRef(finishEdit);
+  useEffect(() => {
+    finishEditRef.current = finishEdit;
+  });
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // ⌘/Ctrl+S：编辑态下保存并屏蔽浏览器“保存网页”对话框
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        if (editingRef.current) {
+          event.preventDefault();
+          void finishEditRef.current(true);
+        }
+        return;
+      }
       if (event.key !== "Escape") return;
       if (editing) {
         event.preventDefault();
@@ -626,12 +805,21 @@ export function Reader({
     return () => window.removeEventListener("keydown", onKey);
   }, [discardEdit, editing, wide]);
 
+  // 新建跳转：进编辑态后把光标直接放进正文，落地即可输入
+  useEffect(() => {
+    if (!initialEditing) return;
+    contentRef.current?.querySelector<HTMLElement>(".reader-prose")?.focus();
+  }, [initialEditing]);
+
   // 编辑态：标记 dirty + 关页前拦截，避免“改了但没存”
   useEffect(() => {
     if (!editing) return;
     const prose = contentRef.current?.querySelector(".reader-prose");
-    const mark = () => {
+    const mark = (event: Event) => {
+      // Mermaid 源码编辑器里的输入只是草稿，未「应用」前不算正文修改
+      if ((event.target as HTMLElement | null)?.closest?.(".mermaid-diagram__editor")) return;
       dirtyRef.current = true;
+      setDirty(true);
     };
     prose?.addEventListener("input", mark);
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -680,6 +868,15 @@ export function Reader({
     handleTableNotice("已插入空白表格，点击单元格即可输入");
   }
 
+  // 编辑态插入流程图：figure 立即渲染预览，保存后升级为可交互的完整图组件
+  function handleInsertMermaid() {
+    const prose =
+      contentRef.current?.querySelector<HTMLElement>(".reader-prose");
+    if (!prose) return;
+    void insertMermaidAtSelection(prose, theme, accent);
+    handleTableNotice("已插入流程图 · 保存后可缩放、全屏与编辑源码");
+  }
+
   // 加载后按锚点恢复正文标记：高亮 + 批注原文，让“哪里被标注过”一眼可见
   useEffect(() => {
     if (editing || !article) return;
@@ -694,14 +891,8 @@ export function Reader({
       const located = locateQuote(prose, highlight.text, highlight.prefix);
       if (!located) continue;
       wrapOffsets(located.nodes, located.start, located.end, () => {
-        const span = document.createElement("span");
-        span.className = "highlight-mark";
-        span.dataset.color = highlight.color;
-        span.style.background =
-          HIGHLIGHT_BG[highlight.color] || HIGHLIGHT_BG.yellow;
-        span.style.borderRadius = "2px";
-        span.style.padding = "0 2px";
-        span.style.cursor = "pointer";
+        const span = createHighlightSpan(highlight.color);
+        span.dataset.highlightId = highlight.id;
         return span;
       });
     }
@@ -717,7 +908,7 @@ export function Reader({
         return span;
       });
     }
-  }, [article, editing]);
+  }, [article, editing, renderTick]);
 
   useEffect(() => {
     if (editing) {
@@ -766,7 +957,7 @@ export function Reader({
       });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [article, editing, initialCitation]);
+  }, [article, editing, initialCitation, renderTick]);
 
   const outline = useMemo(
     () => extractArticleOutline(article?.content ?? ""),
@@ -781,9 +972,8 @@ export function Reader({
     const root = contentRef.current;
     if (!root || editing || outline.length === 0) return;
     const nodes = outline
-      .map((item) => document.getElementById(item.id))
+      .map((item) => root.querySelector<HTMLElement>(`#${item.id}`))
       .filter((node): node is HTMLElement => Boolean(node));
-    if (nodes.length === 0) return;
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -796,7 +986,7 @@ export function Reader({
     );
     for (const node of nodes) observer.observe(node);
     return () => observer.disconnect();
-  }, [outline, editing, article?.content]);
+  }, [outline, editing, renderTick]);
 
   const openedHash = useRef(false);
   useEffect(() => {
@@ -817,15 +1007,8 @@ export function Reader({
     if (!root) return;
     scrollHeadingIntoView(id, root);
     setActiveHeading(id);
-    const next = `${window.location.pathname}${window.location.search}#${id}`;
-    window.history.replaceState(null, "", next);
-  }
-
-  if (loading) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="skeleton h-12 w-64 rounded-lg" />
-      </div>
+    window.history.replaceState(
+      null, "", `${window.location.pathname}${window.location.search}#${id}`,
     );
   }
 
@@ -900,9 +1083,9 @@ export function Reader({
             </div>
             <div className="reader-toolbar-actions">
               <span className="reader-progress-copy">
-                进度 {Math.round(article.readingProgress)}%
+                进度 {Math.round(progress)}%
               </span>
-              {quizDay && (
+              {quizDay && !readOnly && (
                 <button
                   type="button"
                   onClick={() => void toggleQuizDone()}
@@ -1011,12 +1194,36 @@ export function Reader({
                   </button>
                   <button
                     type="button"
+                    onClick={() => setShareOpen(true)}
+                    className="reader-icon-button"
+                    title="分享这一篇（免登录链接，始终看到最新版）"
+                    aria-label="分享这一篇"
+                  >
+                    <Share2 aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleSummarize}
                     className="reader-icon-button"
                     title="总结全文"
                     aria-label="总结全文"
                   >
                     <Sparkles aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAiOpen((current) => !current)
+                    }
+                    className={
+                      aiOpen
+                        ? "reader-icon-button reader-icon-button--active"
+                        : "reader-icon-button"
+                    }
+                    title="AI 对话（引用本文，可让 AI 修改文章）"
+                    aria-label="AI 对话"
+                  >
+                    <BotMessageSquare aria-hidden="true" />
                   </button>
                   <button
                     type="button"
@@ -1031,6 +1238,23 @@ export function Reader({
                     ) : (
                       <Wand2 aria-hidden="true" />
                     )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void toggleFavorite()}
+                    className={
+                      article.favoritedAt
+                        ? "reader-icon-button reader-icon-button--active"
+                        : "reader-icon-button"
+                    }
+                    title={article.favoritedAt ? "从收藏夹移除" : "加入收藏夹"}
+                    aria-label={article.favoritedAt ? "从收藏夹移除" : "加入收藏夹"}
+                    aria-pressed={Boolean(article.favoritedAt)}
+                  >
+                    <Star
+                      aria-hidden="true"
+                      fill={article.favoritedAt ? "currentColor" : "none"}
+                    />
                   </button>
                   <button
                     type="button"
@@ -1087,7 +1311,7 @@ export function Reader({
           {/* 进度条 */}
           <div
             className="reader-top-progress"
-            style={{ width: `${article.readingProgress}%` }}
+            style={{ "--progress": progress / 100 } as CSSProperties}
           />
 
           {/* 左缘悬停：同文件夹文章抽屉 */}
@@ -1177,22 +1401,20 @@ export function Reader({
               >
                 {editing ? (
                   <>
+                    <i
+                      className={
+                        dirty
+                          ? "reader-hint-dot reader-hint-dot--dirty"
+                          : "reader-hint-dot"
+                      }
+                      aria-hidden="true"
+                      title={dirty ? "有未保存的修改" : "暂无修改"}
+                    />
                     <span className="reader-hint-text">
                       {saveError ||
                         editNotice ||
-                        `原位编辑中 · 点顶部“完成”自动保存并回到预览 · ESC 放弃${article.url?.startsWith("obsidian://") ? " · 保存后写回 Obsidian Vault" : ""}`}
+                        `原位编辑中 · ${dirty ? "有未保存修改 · " : ""}⌘S 或点“完成”保存 · ESC 放弃${article.url?.startsWith("obsidian://") ? readOnly ? " · 保存到云端并备份旧版" : " · 保存后写回 Obsidian Vault" : ""}`}
                     </span>
-                    {!saveError && (
-                      <button
-                        type="button"
-                        className="reader-hint-tool"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={handleInsertTable}
-                        title="在光标位置插入空白表格"
-                      >
-                        <Table aria-hidden="true" /> 插入表格
-                      </button>
-                    )}
                   </>
                 ) : (
                   <>
@@ -1210,6 +1432,13 @@ export function Reader({
                 )}
               </div>
             )}
+            {editing && (
+              <EditToolbar
+                containerRef={contentRef}
+                onInsertTable={handleInsertTable}
+                onInsertMermaid={handleInsertMermaid}
+              />
+            )}
             <div className="reader-stage">
               {outline.length >= 2 && (
                 <aside className="reader-toc" aria-label="篇内导航">
@@ -1217,81 +1446,57 @@ export function Reader({
                     本篇目录
                     <span>{outline.length} 个小节</span>
                   </p>
-                  <ArticleOutline
-                    items={outline}
-                    activeId={currentHeading}
-                    onJump={jumpToHeading}
-                  />
+                  <ArticleOutline items={outline} activeId={currentHeading} onJump={jumpToHeading} />
                 </aside>
               )}
-              <article className="reader-article">
-                <ViewTransition
-                  name={`document-${article.id}`}
-                  share="document-morph"
-                  default="none"
-                >
-                  <header className="reader-article-intro">
-                    <h1>{article.title}</h1>
-                    <p className="reader-byline">
-                      <span>{articleOrigin(article)}</span>
-                      {articleStamp(article.updatedAt) ? (
-                        <span>
-                          <span aria-hidden="true">·</span>
-                          <time dateTime={article.updatedAt}>
-                            {articleStamp(article.updatedAt)}
-                          </time>
-                        </span>
-                      ) : null}
+            <article className="reader-article">
+              <ViewTransition
+                name={`document-${article.id}`}
+                share="document-morph"
+                default="none"
+              >
+                <header className="reader-article-intro">
+                  <h1>{article.title}</h1>
+                  <p className="reader-byline">
+                    <span>{articleOrigin(article)}</span>
+                    {articleStamp(article.updatedAt) && (
                       <span>
                         <span aria-hidden="true">·</span>
-                        约 {minutes} 分钟阅读
+                        <time dateTime={article.updatedAt}>{articleStamp(article.updatedAt)}</time>
                       </span>
-                    </p>
-                    <ReaderTuner
-                      font={font}
-                      size={size}
-                      onFont={setFont}
-                      onSize={setSize}
-                    />
-                    {article.tags.length > 0 && (
-                      <div className="reader-tags">
-                        {article.tags.map((tag) => (
-                          <span key={tag}>#{tag}</span>
-                        ))}
-                      </div>
                     )}
-                    {outline.length >= 2 && (
-                      <details className="reader-toc-mobile">
-                        <summary>
-                          本篇目录
-                          <span>{outline.length} 个小节</span>
-                        </summary>
-                        <ArticleOutline
-                          items={outline}
-                          activeId={currentHeading}
-                          onJump={jumpToHeading}
-                        />
-                      </details>
-                    )}
-                  </header>
-                </ViewTransition>
-                <MarkdownArticle
-                  key={editing ? "editing" : "preview"}
-                  content={article.content}
-                  editing={editing}
-                  articleId={articleId}
-                  documentTitle={article.title}
-                  font={font}
-                  size={size}
-                  quizDay={quizDay}
-                  quizWrong={quizWrong}
-                  onToggleWrong={(qIndex, on) =>
-                    void toggleEmbedWrong(qIndex, on)
-                  }
-                  onMarkClick={(text) => openDesk("note", text)}
-                  onTableNotice={handleTableNotice}
-                />
-              </article>
+                    <span><span aria-hidden="true">·</span>约 {minutes} 分钟阅读</span>
+                  </p>
+                  <ReaderTuner font={font} size={size} onFont={setFont} onSize={setSize} />
+                  {article.tags.length > 0 && <div className="reader-tags">
+                    {article.tags.map((tag) => (
+                      <span key={tag}>#{tag}</span>
+                    ))}
+                  </div>}
+                  {outline.length >= 2 && (
+                    <details className="reader-toc-mobile">
+                      <summary>本篇目录<span>{outline.length} 个小节</span></summary>
+                      <ArticleOutline items={outline} activeId={currentHeading} onJump={jumpToHeading} />
+                    </details>
+                  )}
+                </header>
+              </ViewTransition>
+              <MarkdownArticle
+                key={editing ? "editing" : "preview"}
+                content={article.content}
+                title={article.title}
+                font={font}
+                size={size}
+                editing={editing}
+                articleId={articleId}
+                quizDay={quizDay}
+                quizWrong={quizWrong}
+                onToggleWrong={toggleEmbedWrong}
+                onMarkClick={handleMarkClick}
+                onTableNotice={handleTableNotice}
+                onRendered={handleArticleRendered}
+              />
+            </article>
             </div>
           </div>
         </div>
@@ -1303,12 +1508,10 @@ export function Reader({
             articleTitle={article.title}
             articleContent={article.content}
             articleSource={article.source}
-            articleUrl={article.url}
             notes={article.notes}
             highlights={article.highlights}
             activeTab={deskTab}
             selection={deskSelection}
-            initialQuestion={deskQuestion}
             onTabChange={setDeskTab}
             onClose={() => setDeskOpen(false)}
             onNoteCreated={(note) =>
@@ -1353,26 +1556,51 @@ export function Reader({
           />
         )}
 
+        {aiOpen && !editing && (
+          <ReaderAiChat
+            key={`ai-chat-${aiRequestKey}`}
+            articleId={articleId}
+            articleTitle={article.title}
+            articleContent={article.content}
+            selection={aiChatSelection}
+            initialQuestion={aiQuestion}
+            onClose={() => setAiOpen(false)}
+            onApplyEdit={applyAiEdit}
+          />
+        )}
+
         {/* 选中浮窗 */}
-        <HighlightToolbar
+        {!readOnly && <HighlightToolbar
           position={selection}
-          onDawnAgent={handleDawnAgent}
           onHighlight={applyHighlight}
           onNote={handleNote}
           onIngest={handleIngest}
-        />
+          onAskAi={handleAskAi}
+          onBold={() => void applyBold()}
+        />}
 
         {pendingDelete && article && (
           <DeleteDocumentDialog
             doc={{ id: article.id, title: article.title, url: article.url }}
-            onDeleted={() => router.push("/reading")}
+            onDeleted={() => router.replace("/reading")}
             onClose={() => setPendingDelete(false)}
+          />
+        )}
+
+        {shareOpen && article && (
+          <ShareDialog
+            articleId={article.id}
+            title={article.title}
+            onClose={() => setShareOpen(false)}
           />
         )}
       </div>
     </ViewTransition>
   );
 }
+
+const RESTORE_PROGRESS_MIN = 3;
+const RESTORE_PROGRESS_MAX = 97;
 
 const HIGHLIGHT_BG: Record<string, string> = {
   yellow: "rgba(250,204,21,0.3)",
@@ -1534,52 +1762,96 @@ function locateCitationQuote(prose: HTMLElement, markdownQuote: string) {
 }
 
 function scrollHeadingIntoView(id: string, root: HTMLElement) {
-  const target = document.getElementById(id);
+  const target = root.querySelector<HTMLElement>(`#${id}`);
   if (!target) return;
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const top =
-    target.getBoundingClientRect().top -
-    root.getBoundingClientRect().top +
-    root.scrollTop -
-    16;
+  const top = target.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop - 16;
   root.scrollTo({ top: Math.max(0, top), behavior: reduce ? "auto" : "smooth" });
 }
 
-function getTextOffset(container: Node, range: Range) {
+function getTextOffset(
+  container: Node,
+  range: Range,
+  edge: "start" | "end" = "start",
+) {
   const leading = document.createRange();
   leading.selectNodeContents(container);
-  leading.setEnd(range.startContainer, range.startOffset);
+  if (edge === "start") leading.setEnd(range.startContainer, range.startOffset);
+  else leading.setEnd(range.endContainer, range.endOffset);
   return leading.toString().length;
 }
 
-function MarkdownArticle({
+function createHighlightSpan(color: string) {
+  const span = document.createElement("span");
+  span.className = "highlight-mark";
+  span.dataset.color = color;
+  span.style.background = HIGHLIGHT_BG[color] || HIGHLIGHT_BG.yellow;
+  return span;
+}
+
+const MarkdownArticle = memo(function MarkdownArticle({
   content,
+  title,
+  font = "serif",
+  size = "md",
   editing = false,
   articleId = null,
-  documentTitle,
-  font = "sans",
-  size = "md",
   onMarkClick,
   onTableNotice,
+  onRendered,
   quizDay,
   quizWrong,
   onToggleWrong,
 }: {
   content: string;
-  editing?: boolean;
-  articleId?: string | null;
-  documentTitle?: string;
+  title?: string;
   font?: ReaderFont;
   size?: ReaderSize;
+  editing?: boolean;
+  articleId?: string | null;
   quizDay?: string | null;
   quizWrong?: number[];
   onToggleWrong?: (qIndex: number, on: boolean) => void;
   onMarkClick?: (text: string) => void;
   onTableNotice?: (message: string, isError?: boolean) => void;
+  onRendered?: () => void;
 }) {
   const router = useRouter();
   const [linkMap, setLinkMap] = useState<Record<string, string>>({});
   const proseRef = useRef<HTMLDivElement>(null);
+  // 编辑态正文不写回 state：占位提示靠监听输入跟踪 DOM 是否仍为空
+  const [domEmpty, setDomEmpty] = useState(content.trim() === "");
+  const quizWrongRef = useRef(quizWrong);
+  // 整篇 Markdown 解析很重：只在正文或链接映射变化时重算，选区/进度等状态变化不再触发
+  const blocks = useMemo(() => splitMermaidBlocks(content), [content]);
+  const fragmentHtml = useMemo(
+    () => {
+      const options: RenderOptions = { headings: { section: 0, subsection: 0 } };
+      return blocks.map((block) =>
+        block.type === "mermaid" ? "" : renderMarkdown(block.content, linkMap, options),
+      );
+    },
+    [blocks, linkMap],
+  );
+
+  useEffect(() => {
+    quizWrongRef.current = quizWrong;
+    // 错题收录状态变化时同步已挂载的开关，不必重新拉取题集
+    const el = proseRef.current;
+    if (!el) return;
+    el.querySelectorAll<HTMLElement>(".quiz-embed-options[data-q-index]").forEach((block) => {
+      const button = block.querySelector<HTMLButtonElement>(".quiz-embed-wrong-btn");
+      if (!button) return;
+      const on = (quizWrong ?? []).includes(Number(block.dataset.qIndex));
+      button.classList.toggle("quiz-embed-wrong-btn--on", on);
+      button.dataset.label = on ? "已收录错题" : "收录错题";
+    });
+  }, [quizWrong]);
+
+  // 正文 DOM 被重写（首渲染 / 链接回填 / 退出编辑）后通知父组件重新挂载标记
+  useEffect(() => {
+    if (!editing) onRendered?.();
+  }, [fragmentHtml, editing, onRendered]);
 
   // 编辑态：为每个表格注入操作工具栏（增删行列 / 删除表格），退出编辑时清理
   useEffect(() => {
@@ -1626,7 +1898,7 @@ function MarkdownArticle({
           );
           if (!match) continue;
           block.dataset.qIndex = String(match.index);
-          const on = (quizWrong ?? []).includes(match.index);
+          const on = (quizWrongRef.current ?? []).includes(match.index);
           const button = createWrongButton(on);
           block.prepend(button);
         }
@@ -1652,7 +1924,20 @@ function MarkdownArticle({
       cancelled = true;
       el.removeEventListener("click", onClick);
     };
-  }, [content, linkMap, editing, quizDay, quizWrong, onToggleWrong]);
+  }, [content, linkMap, editing, quizDay, onToggleWrong]);
+
+  // 正文以与文章标题相同的 H1 开头时视觉隐藏：intro 卡片已展示标题，重复出现排版很重。
+  // 只隐藏不删除——原位编辑保存走 serializeProse（从 DOM 反序列化），节点必须在。
+  useEffect(() => {
+    const el = proseRef.current;
+    if (!el) return;
+    const first = el.querySelector<HTMLElement>(
+      ".reader-markdown-fragment:first-child > h1:first-child",
+    );
+    if (!first) return;
+    const dup = Boolean(title) && (first.textContent ?? "").trim() === title?.trim();
+    first.classList.toggle("reader-h1--dup", dup);
+  }, [fragmentHtml, title]);
 
   // 渲染后批量把文内链接解析为真实 /reading/<id> href，点击零延迟
   // 编辑态跳过：链接本就不可点，且异步回填会重绘 innerHTML，冲掉正在编辑的 DOM
@@ -1677,16 +1962,18 @@ function MarkdownArticle({
     };
   }, [content, editing]);
 
-  const blocks = splitMermaidBlocks(content);
-  const headingState: HeadingState = { section: 0, subsection: 0 };
-  const renderOptions: RenderOptions = {
-    headings: headingState,
-    documentTitle,
-    omitOpeningTitle: Boolean(
-      documentTitle && opensWithDocumentTitle(content, documentTitle),
-    ),
-  };
+  // 输入/撤销都走 input 事件：据此切换空文占位提示
+  useEffect(() => {
+    const prose = proseRef.current;
+    if (!prose) return;
+    const sync = () => setDomEmpty((prose.textContent ?? "").trim() === "");
+    sync();
+    prose.addEventListener("input", sync);
+    return () => prose.removeEventListener("input", sync);
+  }, [content, editing]);
+
   return (
+    <>
     <div
       ref={proseRef}
       className={
@@ -1699,8 +1986,11 @@ function MarkdownArticle({
       spellCheck={false}
       onClick={(event) => {
         if (editing) {
-          // 编辑态下阻止链接跳转与复制按钮，点击仅用于放置光标
-          event.preventDefault();
+          // 编辑态下阻止链接跳转与复制按钮，点击仅用于放置光标；
+          // Mermaid 图块内部是自带交互的编辑器（contentEditable=false），放行
+          if (!(event.target as HTMLElement).closest(".mermaid-diagram")) {
+            event.preventDefault();
+          }
           return;
         }
         const markEl = (event.target as HTMLElement).closest<HTMLElement>(
@@ -1718,20 +2008,29 @@ function MarkdownArticle({
     >
       {blocks.map((block, index) =>
         block.type === "mermaid" ? (
-          <MermaidDiagram source={block.content} key={`mermaid-${index}`} />
+          <MermaidDiagram
+            source={block.content}
+            editable={editing}
+            key={`mermaid-${index}`}
+          />
         ) : (
           <div
             className="reader-markdown-fragment"
-            dangerouslySetInnerHTML={{
-              __html: renderMarkdown(block.content, linkMap, renderOptions),
-            }}
+            dangerouslySetInnerHTML={{ __html: fragmentHtml[index] }}
             key={`markdown-${index}`}
           />
         ),
       )}
     </div>
+    {editing && domEmpty && (
+      // 占位在 .reader-prose 之外：serializeProse 只遍历正文顶层子节点，不会把它写进文档
+      <p className="reader-prose-placeholder" aria-hidden="true">
+        空白文档 · 直接开始写，或从上方工具条插入标题、表格与流程图
+      </p>
+    )}
+    </>
   );
-}
+});
 
 /** 提取文内所有 vault 链接目标（wikilink / 嵌入 / md 链接），供批量解析 */
 function extractLinkTargets(md: string): string[] {
@@ -1842,435 +2141,46 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-function splitMermaidBlocks(markdown: string) {
-  const blocks: Array<{ type: "markdown" | "mermaid"; content: string }> = [];
-  const pattern = /```[ \t]*mermaid[ \t]*\n([\s\S]*?)```/gi;
-  let cursor = 0;
 
-  for (const match of markdown.matchAll(pattern)) {
-    const start = match.index ?? 0;
-    if (start > cursor)
-      blocks.push({ type: "markdown", content: markdown.slice(cursor, start) });
-    blocks.push({ type: "mermaid", content: match[1] });
-    cursor = start + match[0].length;
+/**
+ * 在 Markdown 源码里定位渲染后的选中文本并做加粗/取消加粗。
+ * 渲染文本与源码的差异是空白（软换行合并）与行内标记（**、` 等）被剥掉，
+ * 所以逐字符之间允许出现少量空白/标记字符；围栏、wikilink 内不做手术。
+ */
+function boldInSource(
+  content: string,
+  selected: string,
+): { content: string; unbolded: boolean } | null {
+  const joiner = "[\\s*_~>#]*";
+  const pattern = selected
+    .split("")
+    .map((char) => char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join(joiner);
+  const regex = new RegExp(pattern);
+  const match = regex.exec(content);
+  if (!match) return null;
+  // 跨段误配防线：匹配到的源码跨度不应远超选区本身
+  if (match[0].length > selected.length * 2 + 8) return null;
+  const start = match.index;
+  const end = start + match[0].length;
+
+  // 围栏内不动（``` 成对计数，奇数说明在围栏里）
+  const fencesBefore = (content.slice(0, start).match(/```/g) ?? []).length;
+  if (fencesBefore % 2 === 1) return null;
+  // wikilink 内不动（[[ 多于 ]] 说明在链接里）
+  const before = content.slice(0, start);
+  if ((before.match(/\[\[/g) ?? []).length > (before.match(/\]\]/g) ?? []).length) {
+    return null;
   }
 
-  if (cursor < markdown.length)
-    blocks.push({ type: "markdown", content: markdown.slice(cursor) });
-  return blocks.length
-    ? blocks
-    : [{ type: "markdown" as const, content: markdown }];
-}
-
-/** 覆盖阅读场景常用块级语法，并在插入 DOM 前统一转义原始内容。 */
-type LinkMap = Record<string, string>;
-
-type RenderOptions = {
-  headings: HeadingState;
-  documentTitle?: string;
-  omitOpeningTitle?: boolean;
-  titleOmitted?: boolean;
-};
-
-function renderMarkdown(
-  md: string,
-  linkMap: LinkMap = {},
-  options?: RenderOptions,
-): string {
-  if (!md) return "";
-
-  const lines = md.replace(/\r\n/g, "\n").split("\n");
-  const output: string[] = [];
-  let paragraph: string[] = [];
-
-  function flushParagraph() {
-    if (paragraph.length === 0) return;
-    output.push(`<p>${renderInline(paragraph.join(" "), linkMap)}</p>`);
-    paragraph = [];
+  // 已是 **选区** 时切换为取消加粗
+  if (content.slice(start - 2, start) === "**" && content.slice(end, end + 2) === "**") {
+    return {
+      content: content.slice(0, start - 2) + match[0] + content.slice(end + 2),
+      unbolded: true,
+    };
   }
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith("```")) {
-      flushParagraph();
-      const language = trimmed
-        .slice(3)
-        .trim()
-        .replace(/[^a-zA-Z0-9_-]/g, "");
-      const code: string[] = [];
-      index += 1;
-      while (index < lines.length && !lines[index].trim().startsWith("```")) {
-        code.push(lines[index]);
-        index += 1;
-      }
-      output.push(
-        `<pre${language ? ` data-language="${language}"` : ""}><button type="button" class="code-copy-btn" aria-label="复制代码">复制</button><code>${escapeHtml(code.join("\n"))}</code></pre>`,
-      );
-      continue;
-    }
-
-    if (!trimmed) {
-      flushParagraph();
-      continue;
-    }
-
-    const heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
-    if (heading) {
-      flushParagraph();
-      const level = heading[1].length;
-      if (
-        options?.omitOpeningTitle &&
-        !options.titleOmitted &&
-        level === 1 &&
-        options.documentTitle &&
-        normalizeTitle(heading[2]) === normalizeTitle(options.documentTitle)
-      ) {
-        options.titleOmitted = true;
-        continue;
-      }
-      const isRelated = /相关(笔记|文档|链接|资料)|关联(文档|笔记|链接)/.test(
-        heading[2],
-      );
-      if (isRelated) {
-        // 前面的 <hr /> 分隔线一并标记，打印时随小节隐藏
-        for (let i = output.length - 1; i >= 0; i -= 1) {
-          if (output[i] === "<hr />") {
-            output[i] = '<hr class="reader-related-hr" />';
-            break;
-          }
-          if (output[i].trim()) break;
-        }
-      }
-      const id = options?.headings
-        ? headingIdFor(level, options.headings)
-        : undefined;
-      const numbered =
-        level === 3 ? heading[2].match(/^(\d+)[.、]\s+(.+)$/) : null;
-      const inner = numbered
-        ? `<span class="reader-h-index">${escapeHtml(numbered[1])}.</span> ${renderInline(numbered[2], linkMap)}`
-        : renderInline(heading[2], linkMap);
-      const className = isRelated ? ' class="reader-related-heading"' : "";
-      output.push(
-        `<h${level}${id ? ` id="${id}" tabindex="-1"` : ""}${className}>${inner}</h${level}>`,
-      );
-      continue;
-    }
-
-    if (
-      index + 1 < lines.length &&
-      trimmed.includes("|") &&
-      isTableSeparator(lines[index + 1])
-    ) {
-      flushParagraph();
-      const headers = tableCells(trimmed);
-      const rows: string[][] = [];
-      index += 2;
-      while (
-        index < lines.length &&
-        lines[index].trim() &&
-        lines[index].includes("|")
-      ) {
-        rows.push(tableCells(lines[index]));
-        index += 1;
-      }
-      index -= 1;
-      output.push(
-        `<div class="reader-table-wrap"><table><thead><tr>${headers
-          .map((cell) => `<th>${renderInline(cell, linkMap)}</th>`)
-          .join("")}</tr></thead><tbody>${rows
-          .map(
-            (row) =>
-              `<tr>${headers
-                .map(
-                  (_, cellIndex) =>
-                    `<td>${renderInline(row[cellIndex] || "", linkMap)}</td>`,
-                )
-                .join("")}</tr>`,
-          )
-          .join("")}</tbody></table></div>`,
-      );
-      continue;
-    }
-
-    if (/^>\s?/.test(trimmed)) {
-      flushParagraph();
-      const quote: string[] = [];
-      while (index < lines.length && /^>\s?/.test(lines[index].trim())) {
-        quote.push(lines[index].trim().replace(/^>\s?/, ""));
-        index += 1;
-      }
-      index -= 1;
-      const callout = quote[0]?.match(/^\[!([a-z-]+)\]\s*(.*)$/i);
-      if (callout) {
-        const type = callout[1].toLowerCase();
-        const label = calloutLabel(type);
-        const body = [callout[2], ...quote.slice(1)].filter(Boolean).join(" ");
-        output.push(
-          `<aside class="reader-callout reader-callout--${escapeHtml(type)}"><strong><span></span>${label}</strong><p>${renderInline(body, linkMap)}</p></aside>`,
-        );
-      } else {
-        output.push(
-          `<blockquote class="reader-quote">${renderInline(quote.join(" "), linkMap)}</blockquote>`,
-        );
-      }
-      continue;
-    }
-
-    const unordered = trimmed.match(/^[-*+]\s+(.+)$/);
-    const ordered = trimmed.match(/^\d+[.)]\s+(.+)$/);
-    if (unordered || ordered) {
-      flushParagraph();
-      const listTag = ordered ? "ol" : "ul";
-      const items: string[] = [];
-      const itemPattern = ordered ? /^\d+[.)]\s+(.+)$/ : /^[-*+]\s+(.+)$/;
-      while (index < lines.length) {
-        const raw = lines[index];
-        const item = raw.trim().match(itemPattern);
-        if (item) {
-          items.push(item[1]);
-          index += 1;
-          continue;
-        }
-        // 缩进行视为上一个列表项的续行（如长代码折行）
-        const continuation = raw.match(/^(?:\s{2,}|\t)(\S.*)$/);
-        if (continuation && items.length > 0) {
-          items[items.length - 1] += ` ${continuation[1].trim()}`;
-          index += 1;
-          continue;
-        }
-        // 松散列表：空行后仍是同级列表项则不中断
-        if (!raw.trim() && index + 1 < lines.length) {
-          const next = lines[index + 1];
-          if (next.trim().match(itemPattern) || /^(?:\s{2,}|\t)\S/.test(next)) {
-            index += 1;
-            continue;
-          }
-        }
-        break;
-      }
-      index -= 1;
-      output.push(
-        `<${listTag}>${items.map((text) => renderListItem(text, linkMap)).join("")}</${listTag}>`,
-      );
-      continue;
-    }
-
-    if (/^([-*_])\1{2,}$/.test(trimmed)) {
-      flushParagraph();
-      output.push("<hr />");
-      continue;
-    }
-
-    if (/^<details\b/i.test(trimmed)) {
-      flushParagraph();
-      const chunk: string[] = [line];
-      let closed = /<\/details>/i.test(trimmed);
-      while (!closed && index + 1 < lines.length) {
-        index += 1;
-        chunk.push(lines[index]);
-        closed = /<\/details>/i.test(lines[index]);
-      }
-      output.push(renderDetailsBlock(chunk.join("\n"), linkMap, options));
-      continue;
-    }
-
-    paragraph.push(trimmed);
-  }
-
-  flushParagraph();
-  return output.join("\n");
+  return { content: content.slice(0, start) + `**${match[0]}**` + content.slice(end), unbolded: false };
 }
 
-/** <details>/<summary> 折叠块：默认收起，点击 summary 展开 */
-function renderDetailsBlock(
-  source: string,
-  linkMap: LinkMap = {},
-  options?: RenderOptions,
-): string {
-  const inner = source
-    .replace(/<details[^>]*>/gi, "")
-    .replace(/<\/details>/gi, "");
-  const summaryMatch = inner.match(/<summary[^>]*>([\s\S]*?)<\/summary>/i);
-  const summary = summaryMatch
-    ? summaryMatch[1].replace(/<[^>]+>/g, "").trim()
-    : "展开详情";
-  const bodySource = summaryMatch ? inner.replace(summaryMatch[0], "") : inner;
-  const body = renderMarkdown(bodySource, linkMap, options);
-  return `<details class="reader-details"><summary>${escapeHtml(summary)}</summary><div class="reader-details-body">${body}</div></details>`;
-}
-
-function renderListItem(text: string, linkMap: LinkMap = {}): string {
-  const task = text.match(/^\[([ xX])\]\s*(.*)$/);
-  if (!task) return `<li>${renderInline(text, linkMap)}</li>`;
-  const done = task[1] !== " ";
-  return `<li class="reader-task"><span class="reader-task-box${done ? " reader-task-box--done" : ""}" aria-hidden="true">${done ? "✓" : ""}</span>${renderInline(task[2], linkMap)}</li>`;
-}
-
-function imageTag(src: string, alt: string): string {
-  const cleanSrc = src.trim().replace(/^\.?\//, "");
-  const url = /^https?:\/\//i.test(cleanSrc)
-    ? cleanSrc
-    : `/api/obsidian/asset?path=${encodeURIComponent(cleanSrc)}`;
-  const label = alt.trim() || cleanSrc.split("/").pop() || "image";
-  return `<img class="reader-img" loading="lazy" src="${escapeHtml(url)}" alt="${escapeHtml(label)}" />`;
-}
-
-function vaultLinkHref(
-  target: string,
-  label: string,
-  linkMap: LinkMap,
-): string {
-  const id = linkMap[target];
-  return id ? `/reading/${id}` : `/reading?search=${encodeURIComponent(label)}`;
-}
-
-function renderInline(value: string, linkMap: LinkMap = {}): string {
-  const codeFragments: string[] = [];
-  const wikiFragments: string[] = [];
-  const embedFragments: string[] = [];
-  const brFragments: string[] = [];
-  let output = value.replace(/`([^`\n]+)`/g, (_match, code: string) => {
-    const index = codeFragments.push(`<code>${escapeHtml(code)}</code>`) - 1;
-    return `\u0000CODE${index}\u0000`;
-  });
-
-  // 表格单元格/行内换行 <br> / <br/> / <br />，转义前占位保护
-  output = output.replace(/<br\s*\/?>/gi, () => {
-    const index = brFragments.push("<br />") - 1;
-    return `\u0000BR${index}\u0000`;
-  });
-
-  // Markdown 图片 ![alt](src)
-  output = output.replace(
-    /!\[([^\]]*)\]\(([^)]+)\)/g,
-    (_match, alt: string, src: string) => {
-      const index = embedFragments.push(imageTag(src.split(/\s+/)[0], alt)) - 1;
-      return `\u0000EMB${index}\u0000`;
-    },
-  );
-
-  // Obsidian 嵌入 ![[target]]
-  output = output.replace(/!\[\[([^\]]+)\]\]/g, (_match, target: string) => {
-    const clean = target.trim();
-    if (/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(clean)) {
-      const index =
-        embedFragments.push(
-          imageTag(
-            clean,
-            clean
-              .split("/")
-              .pop()
-              ?.replace(/\.[^.]+$/, "") || clean,
-          ),
-        ) - 1;
-      return `\u0000EMB${index}\u0000`;
-    }
-    const label = clean.split("/").pop() || clean;
-    const index =
-      embedFragments.push(
-        `<a class="reader-wikilink" data-resolve="${escapeHtml(clean)}" href="${escapeHtml(vaultLinkHref(clean, label, linkMap))}">${escapeHtml(label)}</a>`,
-      ) - 1;
-    return `\u0000EMB${index}\u0000`;
-  });
-
-  output = output.replace(
-    /\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]/g,
-    (_match, target: string, alias?: string) => {
-      const label = (alias || target.split("/").pop() || target).trim();
-      const resolvedTarget = target.trim();
-      const index =
-        wikiFragments.push(
-          `<a class="reader-wikilink" data-resolve="${escapeHtml(resolvedTarget)}" href="${escapeHtml(vaultLinkHref(resolvedTarget, label, linkMap))}">${escapeHtml(label)}</a>`,
-        ) - 1;
-      return `\u0000WIKI${index}\u0000`;
-    },
-  );
-
-  // 普通 Markdown 链接 [text](href)
-  output = output.replace(
-    /\[([^\]]+)\]\(([^)\s]+)\)/g,
-    (_match, text: string, href: string) => {
-      const index = /^https?:\/\//i.test(href)
-        ? embedFragments.push(
-            `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${escapeHtml(text)}</a>`,
-          ) - 1
-        : (() => {
-            const target = href
-              .replace(/^<|>$/g, "")
-              .replace(/\.md$/i, "")
-              .trim();
-            return (
-              embedFragments.push(
-                `<a class="reader-wikilink" data-resolve="${escapeHtml(target)}" href="${escapeHtml(vaultLinkHref(target, text, linkMap))}">${escapeHtml(text)}</a>`,
-              ) - 1
-            );
-          })();
-      return `\u0000EMB${index}\u0000`;
-    },
-  );
-
-  output = escapeHtml(output)
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/__([^_]+)__/g, "<strong>$1</strong>")
-    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-    .replace(/~~([^~]+)~~/g, "<del>$1</del>")
-    .replace(/==([^=\n]+)==/g, "<mark>$1</mark>");
-
-  return output
-    .replace(
-      /\u0000CODE(\d+)\u0000/g,
-      (_match, index: string) => codeFragments[Number(index)],
-    )
-    .replace(
-      /\u0000BR(\d+)\u0000/g,
-      (_match, index: string) => brFragments[Number(index)],
-    )
-    .replace(
-      /\u0000WIKI(\d+)\u0000/g,
-      (_match, index: string) => wikiFragments[Number(index)],
-    )
-    .replace(
-      /\u0000EMB(\d+)\u0000/g,
-      (_match, index: string) => embedFragments[Number(index)],
-    );
-}
-
-function calloutLabel(type: string) {
-  const labels: Record<string, string> = {
-    abstract: "摘要",
-    summary: "摘要",
-    tip: "提示",
-    info: "信息",
-    note: "笔记",
-    warning: "注意",
-    danger: "风险",
-    example: "示例",
-    quote: "引用",
-  };
-  return labels[type] || "补充说明";
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function tableCells(line: string): string[] {
-  return line
-    .trim()
-    .replace(/^\|/, "")
-    .replace(/\|$/, "")
-    .split(/(?<!\\)\|/)
-    .map((cell) => cell.trim().replace(/\\\|/g, "|"));
-}
-
-function isTableSeparator(line: string): boolean {
-  const cells = tableCells(line);
-  return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
-}
+/** 引用/callout 正文：空的 > 行分段，段内软换行合并 */

@@ -1,0 +1,775 @@
+/* 出版级编号列表：带浅色纸感底托、居中等宽数字徽章 */
+.reader-prose ol {
+  counter-reset: reader-ol;
+  list-style: none;
+  margin: 0.9em 0 1.5em;
+  padding-left: 0;
+}
+
+.reader-prose ol > li {
+  counter-increment: reader-ol;
+  position: relative;
+  padding-left: 2.3em;
+  margin: 0.55em 0;
+  line-height: 1.88;
+}
+
+.reader-prose ol > li::before {
+  content: counter(reader-ol);
+  position: absolute;
+  left: 0;
+  top: 0.22em;
+  width: 1.55em;
+  height: 1.55em;
+  border-radius: 6px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-accent-amber) 10%, var(--color-surface)),
+    color-mix(in oklab, var(--color-accent-amber) 18%, var(--color-elevated))
+  );
+  border: 1px solid color-mix(in oklab, var(--color-accent-amber) 28%, var(--color-border));
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--color-accent-amber) 20%, transparent);
+  color: color-mix(in oklab, var(--color-accent-amber) 85%, #3e2e10);
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  font-weight: 650;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+[data-theme="dark"] .reader-prose ol > li::before {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-accent-amber) 20%, var(--color-elevated)),
+    color-mix(in oklab, var(--color-accent-amber) 10%, var(--color-surface))
+  );
+  border-color: color-mix(in oklab, var(--color-accent-amber) 35%, var(--color-border));
+  color: var(--color-accent-amber);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* 出版级无序列表：旋转琥珀色菱形标记，二级转为空心圆点 */
+.reader-prose ul {
+  list-style: none;
+  margin: 0.9em 0 1.5em;
+  padding-left: 0;
+}
+
+.reader-prose ul > li {
+  position: relative;
+  padding-left: 1.4em;
+  margin: 0.55em 0;
+  line-height: 1.88;
+}
+
+.reader-prose ul > li::before {
+  content: "";
+  position: absolute;
+  left: 0.25em;
+  top: 0.72em;
+  width: 6px;
+  height: 6px;
+  border-radius: 1.5px;
+  background: var(--color-accent-amber);
+  border: 1px solid color-mix(in oklab, var(--color-accent-amber) 65%, black);
+  transform: rotate(45deg);
+}
+
+.reader-prose ul ul > li::before {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-secondary);
+  border-radius: 50%;
+  transform: none;
+  width: 5px;
+  height: 5px;
+  top: 0.75em;
+  left: 0.28em;
+}
+
+.reader-prose li > :is(ul, ol) {
+  margin: 0.4em 0 0.5em;
+}
+
+.reader-prose li.reader-task {
+  list-style: none;
+  padding-left: 0;
+}
+
+.reader-prose li.reader-task::before {
+  display: none !important;
+}
+
+.reader-task-box {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  margin-right: 0.55em;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  vertical-align: 0.1em;
+}
+
+.reader-task-box--done {
+  border-color: var(--color-accent-purple);
+  background: var(--color-accent-purple);
+}
+
+.reader-table-wrap {
+  overflow-x: auto;
+  margin: 1.8em 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.reader-prose table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-family: var(--font-reader-sans);
+  font-size: 0.9rem;
+  font-kerning: normal;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.65;
+}
+
+.reader-prose th,
+.reader-prose td {
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding: 11px 13px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.reader-prose th {
+  background: var(--color-elevated);
+  color: var(--color-secondary);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.reader-prose tbody tr:nth-child(even) td {
+  background: color-mix(in oklab, var(--color-elevated) 45%, transparent);
+}
+
+/* 宽表逐行核对时给出跟随反馈，颜色沿用悬停语义而非选中语义 */
+.reader-prose tbody tr:hover td {
+  background: color-mix(in oklab, var(--color-accent-lilac) 38%, transparent);
+}
+
+.reader-prose th code,
+.reader-prose td code {
+  font-size: 0.84em;
+  line-height: 1.45;
+}
+
+.reader-prose tr:last-child td {
+  border-bottom: 0;
+}
+
+.reader-prose th:last-child,
+.reader-prose td:last-child {
+  border-right: 0;
+}
+
+.reader-prose hr:not(.reader-related-hr) {
+  margin: 2.6em 0;
+  border: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-border-strong) 20%,
+    var(--color-border-strong) 80%,
+    transparent
+  );
+}
+
+.mermaid-diagram {
+  overflow: hidden;
+  margin: 2em 0 2.3em;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(
+      circle at 12% 8%,
+      color-mix(in oklab, var(--color-accent-purple) 9%, transparent),
+      transparent 34%
+    ),
+    var(--color-surface);
+  box-shadow: 0 18px 48px
+    color-mix(in oklab, var(--color-primary) 7%, transparent);
+  font-family: var(--font-sans);
+}
+
+.mermaid-diagram > figcaption {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 16px;
+}
+
+.mermaid-diagram > figcaption span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-secondary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.mermaid-diagram > figcaption svg {
+  width: 15px;
+  height: 15px;
+  color: var(--color-accent-purple);
+}
+
+.mermaid-diagram > figcaption small {
+  color: var(--color-accent-amber);
+  font-size: 12px;
+}
+
+.mermaid-diagram__tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mermaid-diagram__tools button,
+.mermaid-lightbox header button {
+  display: inline-flex;
+  min-width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 0 7px;
+  color: var(--color-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background-color 150ms var(--ease-out-expo),
+    color 150ms var(--ease-out-expo);
+}
+
+.mermaid-diagram__tools button:hover,
+.mermaid-lightbox header button:hover {
+  background: var(--color-hover);
+  color: var(--color-primary);
+}
+
+.mermaid-diagram__tools button[data-hint] {
+  background: var(--color-accent-lilac);
+  color: var(--color-accent-purple-dark);
+}
+
+.mermaid-diagram__tools svg,
+.mermaid-lightbox header button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mermaid-diagram__tools output {
+  min-width: 42px;
+  color: var(--color-tertiary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.mermaid-diagram__viewport {
+  position: relative;
+  min-height: 200px;
+  overflow: auto;
+  overscroll-behavior-x: contain;
+  padding: 24px;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-primary) 6.5%, transparent) 0.6px,
+    transparent 0.7px
+  );
+  background-size: 18px 18px;
+  scrollbar-width: thin;
+}
+
+.mermaid-diagram__viewport:focus-visible {
+  outline: 2px solid var(--color-accent-purple);
+  outline-offset: -2px;
+}
+
+/* 溢出可平移的图：抓取光标提示可以拖拽，拖拽中不选中图内文字 */
+.mermaid-diagram__viewport[data-overflow] {
+  cursor: grab;
+}
+
+.mermaid-diagram__viewport[data-panning] {
+  cursor: grabbing;
+}
+
+.mermaid-diagram__viewport[data-panning] * {
+  user-select: none;
+}
+
+/* 画布按 SVG 原始尺寸 × 缩放比例布局：放大时出现横向滚动，而不是把文字压到看不清 */
+.mermaid-diagram__canvas {
+  min-height: 152px;
+  margin-inline: auto;
+}
+
+.mermaid-diagram__canvas svg,
+.mermaid-lightbox__body svg {
+  display: block;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+}
+
+/* 只给虚线边（-.->）加流动，实线边保持实线：线型本身就是语义 */
+.mermaid-diagram__canvas :is(.flowchart-link[class*="dotted"], .messageLine1) {
+  animation: mermaid-flow 1.6s linear infinite;
+}
+
+.mermaid-diagram__canvas :is(.node, .cluster) :is(rect, polygon, circle, path) {
+  rx: 8px;
+}
+
+/* ===== Mermaid 视觉增强：投影分层、顺滑连线、胶囊边标签 =====
+   全部走页面 CSS + 设计令牌：SVG 缓存的是渲染产物，样式在展示时叠加，换主题即时跟随 */
+
+/* 图挂载时轻微上浮淡入，替代生硬的瞬间出现 */
+.mermaid-diagram__canvas svg,
+.mermaid-lightbox__body svg {
+  animation: mermaid-enter 360ms var(--ease-out-expo) both;
+}
+
+@keyframes mermaid-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 节点与子图：细描边 + 两层柔和投影，和页面的卡片语言一致 */
+.mermaid-diagram__canvas :is(.node, .cluster) :is(rect, polygon, circle, path),
+.mermaid-lightbox__body :is(.node, .cluster) :is(rect, polygon, circle, path) {
+  stroke-width: 1.2px;
+  stroke-linejoin: round;
+  transition: filter 160ms ease;
+  filter: drop-shadow(0 1px 2px color-mix(in oklab, var(--color-accent-purple) 16%, transparent))
+    drop-shadow(0 3px 8px color-mix(in oklab, var(--color-accent-purple) 7%, transparent));
+}
+
+/* 悬停微提亮：图大时帮助视线锁定当前节点 */
+.mermaid-diagram__canvas .node:hover :is(rect, polygon, circle),
+.mermaid-lightbox__body .node:hover :is(rect, polygon, circle) {
+  filter: drop-shadow(0 2px 4px color-mix(in oklab, var(--color-accent-purple) 24%, transparent))
+    drop-shadow(0 6px 14px color-mix(in oklab, var(--color-accent-purple) 12%, transparent));
+}
+
+/* 连线：略粗、圆头，与节点的柔和轮廓匹配 */
+.mermaid-diagram__canvas path.flowchart-link,
+.mermaid-lightbox__body path.flowchart-link {
+  stroke-width: 1.6px;
+  stroke-linecap: round;
+}
+
+/* 边标签：表面色胶囊 + 细描边，压住底下的点阵背景 */
+.mermaid-diagram__canvas .edgeLabel rect,
+.mermaid-lightbox__body .edgeLabel rect {
+  rx: 6px;
+  stroke: color-mix(in oklab, var(--color-border) 72%, transparent);
+  stroke-width: 1px;
+}
+
+/* 节点/子图文字加重半档，缩小图缩放后的视觉发虚 */
+.mermaid-diagram__canvas :is(.nodeLabel, .clusterLabel),
+.mermaid-lightbox__body :is(.nodeLabel, .clusterLabel) {
+  font-weight: 500;
+}
+
+.mermaid-diagram__canvas .edgeLabel,
+.mermaid-diagram__canvas .edgeLabel p {
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.mermaid-diagram__loading,
+.mermaid-diagram__error {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: color-mix(in oklab, var(--color-surface) 90%, transparent);
+  color: var(--color-tertiary);
+  font-size: 13px;
+}
+
+.mermaid-diagram__loading > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent-purple);
+  box-shadow: 0 0 0 6px
+    color-mix(in oklab, var(--color-accent-purple) 12%, transparent);
+  animation: node-breathe 1.4s ease-in-out infinite;
+}
+
+.mermaid-diagram__error > svg {
+  width: 20px;
+  flex: none;
+  color: var(--color-accent-amber);
+}
+
+.mermaid-diagram__error > div {
+  display: grid;
+  max-width: 78%;
+  gap: 4px;
+}
+
+.mermaid-diagram__error strong {
+  color: var(--color-primary);
+  font-size: 14px;
+}
+
+.mermaid-diagram__error span {
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.mermaid-diagram > details {
+  border-top: 1px solid var(--color-border);
+  padding: 10px 16px 14px;
+  font-size: 13px;
+}
+
+.mermaid-diagram > details summary {
+  color: var(--color-secondary);
+  cursor: pointer;
+}
+
+.mermaid-diagram > details pre {
+  margin-bottom: 0;
+}
+
+.mermaid-lightbox {
+  width: min(96vw, 1600px);
+  max-width: none;
+  height: min(92dvh, 1100px);
+  max-height: none;
+  margin: auto;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  padding: 0;
+  color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.mermaid-lightbox[open] {
+  display: flex;
+  flex-direction: column;
+  animation: page-in 220ms var(--ease-out-expo) both;
+}
+
+.mermaid-lightbox::backdrop {
+  background: color-mix(in oklab, var(--color-primary) 40%, transparent);
+}
+
+.mermaid-lightbox header {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 12px 0 18px;
+}
+
+.mermaid-lightbox header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.mermaid-lightbox header span svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-accent-purple);
+}
+
+.mermaid-lightbox__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px;
+}
+
+.mermaid-lightbox__body svg {
+  width: auto !important;
+  min-width: 100%;
+  height: auto !important;
+}
+
+/* 书卷式引述卡片：温润背景、左侧琥珀色书脊线、微投影 */
+.reader-quote,
+.reader-prose blockquote {
+  margin: 1.8em 0;
+  border: 1px solid var(--color-border);
+  border-left: 3.5px solid var(--color-accent-amber);
+  border-radius: 4px 12px 12px 4px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-accent-amber) 4%, var(--color-surface)),
+    var(--color-elevated)
+  );
+  box-shadow: 0 2px 6px color-mix(in oklab, var(--color-primary) 3%, transparent);
+  padding: 16px 22px;
+  color: var(--color-primary);
+  font-family: var(--font-serif);
+  font-size: 1.02em;
+  font-style: normal;
+  line-height: 1.88;
+}
+
+.reader-quote > :last-child,
+.reader-prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.reader-details {
+  margin: 1.8em 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-elevated);
+}
+
+.quiz-embed-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 1.6em 0;
+}
+
+.quiz-embed-wrong-btn {
+  align-self: flex-start;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  padding: 3px 12px;
+  color: var(--color-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.quiz-embed-wrong-btn::before {
+  content: attr(data-label);
+}
+
+.quiz-embed-wrong-btn:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.quiz-embed-wrong-btn--on {
+  border-color: var(--color-danger);
+  background: color-mix(in oklab, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+}
+
+.quiz-embed-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  padding: 11px 14px;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.quiz-embed-option:hover {
+  border-color: color-mix(
+    in oklab,
+    var(--color-accent-purple) 55%,
+    var(--color-border)
+  );
+  background: color-mix(in oklab, var(--color-accent-lilac) 40%, transparent);
+}
+
+.quiz-embed-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 4px;
+  accent-color: var(--color-accent-purple);
+  cursor: pointer;
+}
+
+.quiz-embed-key {
+  flex: none;
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  font-weight: 700;
+}
+
+.quiz-embed-text {
+  color: var(--color-primary);
+  line-height: 1.85;
+}
+
+.quiz-embed-option:has(.quiz-embed-check:checked) {
+  border-color: var(--color-accent-purple);
+  background: color-mix(in oklab, var(--color-accent-lilac) 55%, transparent);
+}
+
+.reader-details > summary {
+  padding: 12px 18px;
+  color: var(--color-secondary);
+  font-size: 0.95em;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.reader-details > summary:hover {
+  color: var(--color-primary);
+}
+
+.reader-details[open] > summary {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reader-details-body {
+  padding: 2px 18px 14px;
+}
+
+.reader-details-body > *:first-child {
+  margin-top: 0.9em;
+}
+
+.reader-details-body > *:last-child {
+  margin-bottom: 0.4em;
+}
+
+.reader-callout {
+  --callout-color: var(--color-accent-purple);
+  margin: 1.8em 0;
+  border: 1px solid
+    color-mix(in oklab, var(--callout-color) 22%, var(--color-border));
+  border-left: 3px solid var(--callout-color);
+  border-radius: 4px 12px 12px 4px;
+  background: color-mix(
+    in oklab,
+    var(--callout-color) 7%,
+    var(--color-surface)
+  );
+  padding: 16px 18px;
+  font-family: var(--font-sans);
+}
+
+.reader-callout > strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: color-mix(in oklab, var(--callout-color) 78%, var(--color-primary));
+  font-size: 13px;
+}
+
+.reader-callout > strong span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--callout-color);
+  box-shadow: 0 0 0 4px
+    color-mix(in oklab, var(--callout-color) 12%, transparent);
+}
+
+.reader-callout p {
+  margin: 8px 0 0;
+  color: color-mix(in oklab, var(--color-primary) 80%, var(--color-secondary));
+  font-size: 15px;
+  line-height: 1.85;
+}
+
+.reader-callout--tip,
+.reader-callout--success {
+  --callout-color: var(--color-accent-green);
+}
+
+.reader-callout--warning,
+.reader-callout--caution {
+  --callout-color: var(--color-accent-amber);
+}
+
+.reader-callout--danger,
+.reader-callout--failure,
+.reader-callout--bug {
+  --callout-color: var(--color-accent-rose);
+}
+
+.reader-wikilink {
+  border-bottom: 1px dashed
+    color-mix(in oklab, var(--color-accent-purple) 42%, transparent);
+  color: var(--color-accent-purple-dark);
+  font-family: var(--font-sans);
+  font-size: 0.92em;
+  font-style: normal;
+  text-decoration: none;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.reader-wikilink:hover {
+  border-bottom-style: solid;
+  border-color: var(--color-accent-amber);
+  color: var(--color-primary);
+}
+
+/* 新建文章的空白正文：占位提示引导落笔，开始输入后由组件移除 */
+.reader-prose-placeholder {
+  margin: 4px 0 0;
+  color: var(--color-tertiary);
+  font-size: 14px;
+  line-height: 1.7;
+  pointer-events: none;
+  user-select: none;
+}

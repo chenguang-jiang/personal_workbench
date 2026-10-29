@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 // POST /api/highlights — 创建标注（含位置信息）
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await readJsonObject<{
+    text?: string;
+    color?: string;
+    note?: string;
+    prefix?: string;
+    suffix?: string;
+    startOffset?: number | null;
+    endOffset?: number | null;
+    articleId?: string;
+  }>(req);
+  if (!body) return invalidJsonResponse();
+  if (!body.text || !body.articleId) {
+    return NextResponse.json({ error: "text 与 articleId 必填" }, { status: 400 });
+  }
 
   const highlight = await prisma.highlight.create({
     data: {

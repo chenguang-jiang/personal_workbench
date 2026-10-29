@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { WorkbenchShell } from "@/components/layout/WorkbenchShell";
+import { isCloudMode } from "@/lib/cloud/config";
 import { UiPrefsProvider } from "@/lib/ui-prefs";
 
 const VALID_ACCENTS = new Set(["violet", "blue", "teal", "orange", "crimson", "magenta", "amber"]);
@@ -43,13 +44,9 @@ export default async function RootLayout({
       className={jetbrainsMono.variable}
     >
       <body>
+        <a className="skip-link" href="#main-content">{locale === "en" ? "Skip to content" : "跳转到主要内容"}</a>
         <UiPrefsProvider initial={{ locale, accent, theme }}>
-          <div className="app-shell">
-            <Sidebar />
-            <main className="app-main" id="main-content">
-              {children}
-            </main>
-          </div>
+          <WorkbenchShell cloud={isCloudMode()}>{children}</WorkbenchShell>
         </UiPrefsProvider>
       </body>
     </html>

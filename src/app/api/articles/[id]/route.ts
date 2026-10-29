@@ -3,7 +3,9 @@ import path from "node:path";
 import matter from "gray-matter";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isCloudMode } from "@/lib/cloud/config";
 import { getVaultConfig, syncObsidianFile } from "@/lib/obsidian-sync";
+import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 // GET /api/articles/[id] — 获取文章详情（含标注和笔记）
 export async function GET(
@@ -33,7 +35,30 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const body = await req.json();
+  const body = await readJsonObject<{
+    content?: string;
+    title?: string;
+    summary?: string | null;
+    tags?: string[];
+    readingProgress?: number;
+    lastReadAt?: string | null;
+  }>(req);
+  if (!body) return invalidJsonResponse();
+
+  // 云端模式：代理只对进度放行了本接口，这里兜底限制字段——
+  // 正文/标题等编辑必须走 /api/knowledge/edit（带版本校验与旧版备份）
+  if (
+    isCloudMode() &&
+    (body.content !== undefined ||
+      body.title !== undefined ||
+      body.summary !== undefined ||
+      body.tags !== undefined)
+  ) {
+    return NextResponse.json(
+      { error: "请通过「AI 导入」归档或更新云端知识库" },
+      { status: 403 },
+    );
+  }
 
   // 正文编辑：vault 文章写回原文件并走同步链路（节点/关系/版本号一并更新）
   if (body.content !== undefined && typeof body.content === "string") {

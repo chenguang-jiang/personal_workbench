@@ -1,13 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
   BookOpen,
-  Bot,
-  BrainCircuit,
-  Check,
   ChevronRight,
   FileText,
   Folder,
@@ -18,7 +15,6 @@ import {
   Plus,
   Quote,
   RefreshCw,
-  Save,
   Send,
   Settings2,
   Sparkles,
@@ -27,8 +23,6 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { renderMiniMarkdown } from "@/lib/mini-markdown";
-import { useRouter } from "next/navigation";
-import { createDawnHandoff } from "@/lib/dawn-agent-handoff-client";
 
 type ChatTurn = { role: "user" | "assistant"; content: string };
 type Citation = {
@@ -89,6 +83,21 @@ function answerHtml(value: string) {
     '<button type="button" class="kb-citation" data-citation="$1">[$1]</button>',
   );
 }
+
+// 距离底部小于该值时视为“正在看最新消息”，新消息到达才自动滚到底部
+const STICK_TO_BOTTOM_PX = 120;
+
+/** 每条回答的 Markdown 只在内容变化时重新渲染，避免新消息到达时整列表重算 */
+const AnswerMarkdown = memo(function AnswerMarkdown({
+  content,
+}: {
+  content: string;
+}) {
+  const html = useMemo(() => answerHtml(content), [content]);
+  return (
+    <div className="mini-markdown" dangerouslySetInnerHTML={{ __html: html }} />
+  );
+});
 
 function citationHref(sessionId: string, citation: Citation) {
   const params = new URLSearchParams({
@@ -156,7 +165,6 @@ function formatSessionTime(value: string) {
 }
 
 export function KnowledgeBrainstorm() {
-  const router = useRouter();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [session, setSession] = useState<KnowledgeSession | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -179,6 +187,7 @@ export function KnowledgeBrainstorm() {
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
   const [selectedArticles, setSelectedArticles] = useState<string[]>([]);
   const threadRef = useRef<HTMLDivElement | null>(null);
+  const stickToBottomRef = useRef(true);
 
   const selectedSpace = useMemo(
     () =>
@@ -214,6 +223,7 @@ export function KnowledgeBrainstorm() {
     );
   }, []);
 
+  // 返回加载到的会话，调用方可直接使用，而不依赖尚未生效的 state
   const loadSession = useCallback(async (id: string) => {
     setCitation(null);
     const response = await fetch(`/api/brainstorm/${id}`, {
@@ -221,8 +231,11 @@ export function KnowledgeBrainstorm() {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "会话加载失败");
-    setSession(data);
-    setPolicy(data.groundingPolicy === "assisted" ? "assisted" : "strict");
+    const loaded = data as KnowledgeSession;
+    stickToBottomRef.current = true;
+    setSession(loaded);
+    setPolicy(loaded.groundingPolicy === "assisted" ? "assisted" : "strict");
+    return loaded;
   }, []);
 
   useEffect(() => {
@@ -260,8 +273,15 @@ export function KnowledgeBrainstorm() {
 
   useEffect(() => {
     const el = threadRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [session?.messages.length]);
+    if (el && stickToBottomRef.current) el.scrollTop = el.scrollHeight;
+  }, [session?.messages.length, busy]);
+
+  function handleThreadScroll() {
+    const el = threadRef.current;
+    if (!el) return;
+    stickToBottomRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < STICK_TO_BOTTOM_PX;
+  }
 
   async function start() {
     const text = question.trim();
@@ -281,11 +301,13 @@ export function KnowledgeBrainstorm() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "会话创建失败");
-      await loadSession(data.id);
-      await loadSessions();
+      const created = await loadSession(data.id);
       setQuestion("");
-      // 自动发送问题内容作为第一条消息，无需用户再次输入
-      await sendInternal(text);
+      void loadSessions();
+      // 自动发送问题内容作为第一条消息；显式传入新会话，避免读到闭包里的旧 session
+      const sent = await sendInternal(created, text);
+      // 首问失败时把问题放回输入框，用户可以直接重试
+      if (!sent) setComposer((current) => current || text);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "会话创建失败");
     } finally {
@@ -293,41 +315,54 @@ export function KnowledgeBrainstorm() {
     }
   }
 
-  async function sendInternal(content: string) {
-    if (!content || !session) return;
+  async function sendInternal(target: KnowledgeSession, content: string) {
+    if (!content) return false;
+    const isTarget = (current: KnowledgeSession | null) =>
+      current !== null && current.id === target.id;
+    stickToBottomRef.current = true;
     setSession((current) =>
-      current
-        ? { ...current, messages: [...current.messages, { role: "user", content }] }
+      isTarget(current)
+        ? {
+            ...current!,
+            messages: [...current!.messages, { role: "user", content }],
+          }
         : current,
     );
     try {
       const response = await fetch(
-        `/api/brainstorm/${session.id}/knowledge-message`,
+        `/api/brainstorm/${target.id}/knowledge-message`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "message", content }),
         },
       );
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "回答失败");
       setSession((current) =>
-        current
+        isTarget(current)
           ? {
-              ...current,
+              ...current!,
               messages: [
-                ...current.messages,
+                ...current!.messages,
                 { role: "assistant", content: data.answer },
               ],
-              citations: [...current.citations, ...(data.citations ?? [])],
-              title: data.title ?? current.title,
+              citations: [...current!.citations, ...(data.citations ?? [])],
+              title: data.title ?? current!.title,
             }
           : current,
       );
       void loadSessions();
+      return true;
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "回答失败");
-      await loadSession(session.id).catch(() => {});
+      // 回滚乐观插入的用户消息（服务端未保存失败的这一轮）
+      setSession((current) =>
+        isTarget(current)
+          ? { ...current!, messages: current!.messages.slice(0, -1) }
+          : current,
+      );
+      return false;
     }
   }
 
@@ -337,8 +372,13 @@ export function KnowledgeBrainstorm() {
     setBusy(true);
     setComposer("");
     setNotice("");
-    await sendInternal(content);
-    setBusy(false);
+    try {
+      const sent = await sendInternal(session, content);
+      // 发送失败时恢复用户输入，绝不丢失已输入的内容
+      if (!sent) setComposer((current) => current || content);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function changePolicy(next: "strict" | "assisted") {
@@ -390,65 +430,6 @@ export function KnowledgeBrainstorm() {
     }
   }
 
-  async function action(
-    name: "save-note" | "proposition" | "to-reasoning",
-    assistantContent: string,
-  ) {
-    if (!session) return;
-    setNotice("");
-    const response = await fetch(
-      `/api/brainstorm/${session.id}/knowledge-message`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: name,
-          assistantContent,
-          content: assistantContent.replace(/\[(?:S\d+)\]/g, "").slice(0, 400),
-        }),
-      },
-    );
-    const data = await response.json();
-    if (!response.ok) {
-      setNotice(data.error || "操作失败");
-      return;
-    }
-    if (name === "save-note") setNotice(`已保存到 Obsidian：${data.path}`);
-    if (name === "proposition") setNotice("已加入当前会话的命题台账");
-    if (name === "to-reasoning") {
-      router.push(`/brainstorm?mode=reasoning&session=${data.id}`);
-    }
-  }
-
-  async function handoffToDawn(answer: string, messageIndex: number) {
-    if (!session) return;
-    setBusy(true);
-    setNotice("");
-    try {
-      const evidence = session.citations
-        .filter((item) => item.messageIndex === messageIndex)
-        .map((item) => `[${item.id}] ${item.path}\n${item.quote}`)
-        .join("\n\n");
-      const handoff = await createDawnHandoff({
-        sourceType: "knowledge",
-        sourceTitle: session.question,
-        sourceRef: session.id,
-        selectedText: answer,
-        context: evidence,
-        instruction:
-          "请先核对这些知识库结论与目标项目的真实代码，再把结论转化为可验证的实现任务；涉及修改时给出计划并走审批。",
-        metadata: {
-          knowledgeSpaceId: session.knowledgeSpaceId,
-          groundingPolicy: session.groundingPolicy,
-        },
-      });
-      router.push(`/dawn-agent?handoff=${handoff.id}`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "无法交给 Dawn Agent");
-      setBusy(false);
-    }
-  }
-
   function pickCitation(id: string, messageIndex: number) {
     const found = session?.citations.find(
       (item) => item.id === id && item.messageIndex === messageIndex,
@@ -474,7 +455,12 @@ export function KnowledgeBrainstorm() {
   }
 
   async function selectSession(id: string) {
-    await loadSession(id);
+    try {
+      await loadSession(id);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "会话加载失败");
+      return;
+    }
     if (window.matchMedia("(max-width: 760px)").matches) setSourceOpen(false);
   }
 
@@ -629,7 +615,11 @@ export function KnowledgeBrainstorm() {
         )}
 
         <section className="kb-conversation">
-          <div className="kb-thread" ref={threadRef}>
+          <div
+            className="kb-thread"
+            ref={threadRef}
+            onScroll={handleThreadScroll}
+          >
             {!session ? (
               <div className="kb-start">
                 <span>
@@ -744,15 +734,23 @@ export function KnowledgeBrainstorm() {
                 {session.messages.map((message, index) =>
                   message.role === "user" ? (
                     <article
-                      key={index}
+                      key={`${session.id}-${index}`}
                       className="kb-message kb-message--user"
                     >
                       <p>{message.content}</p>
                     </article>
                   ) : (
                     <article
-                      key={index}
+                      key={`${session.id}-${index}`}
                       className="kb-message kb-message--assistant"
+                      onClick={(event) => {
+                        // 引用角标的点击在外层委托处理，Markdown 本身保持 memo
+                        const target = (
+                          event.target as HTMLElement
+                        ).closest<HTMLElement>("[data-citation]");
+                        if (target?.dataset.citation)
+                          pickCitation(target.dataset.citation, index);
+                      }}
                     >
                       <header>
                         <span>
@@ -765,57 +763,7 @@ export function KnowledgeBrainstorm() {
                             : "来源与补充分区"}
                         </small>
                       </header>
-                      <div
-                        className="mini-markdown"
-                        dangerouslySetInnerHTML={{
-                          __html: answerHtml(message.content),
-                        }}
-                        onClick={(event) => {
-                          const target = (
-                            event.target as HTMLElement
-                          ).closest<HTMLElement>("[data-citation]");
-                          if (target?.dataset.citation)
-                            pickCitation(target.dataset.citation, index);
-                        }}
-                      />
-                      <footer>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void action("save-note", message.content)
-                          }
-                        >
-                          <Save />
-                          保存为笔记
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void action("proposition", message.content)
-                          }
-                        >
-                          <Check />
-                          转为命题
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void action("to-reasoning", message.content)
-                          }
-                        >
-                          <BrainCircuit />
-                          进入推理模式
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void handoffToDawn(message.content, index)
-                          }
-                        >
-                          <Bot />
-                          交给 Dawn Agent
-                        </button>
-                      </footer>
+                      <AnswerMarkdown content={message.content} />
                     </article>
                   ),
                 )}

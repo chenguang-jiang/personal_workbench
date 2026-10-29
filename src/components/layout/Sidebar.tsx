@@ -1,26 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, Fragment } from "react";
 import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
-  Bot,
   BrainCircuit,
   Command,
   FileText,
   GraduationCap,
   LayoutDashboard,
   Library,
+  LogOut,
   Menu,
-  MessagesSquare,
   Network,
-  Newspaper,
   NotebookPen,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
   Settings,
+  Sparkles,
+  Star,
   X,
 } from "lucide-react";
 import { DawnLogo } from "@/components/brand/DawnLogo";
@@ -61,6 +62,12 @@ const NAV_ITEMS: {
     href: "/reading",
   },
   {
+    icon: Star,
+    labelKey: "nav_favorites",
+    hintKey: "nav_favorites_hint",
+    href: "/favorites",
+  },
+  {
     icon: NotebookPen,
     labelKey: "nav_notes",
     hintKey: "nav_notes_hint",
@@ -73,28 +80,16 @@ const NAV_ITEMS: {
     href: "/quiz",
   },
   {
-    icon: Newspaper,
-    labelKey: "nav_daily",
-    hintKey: "nav_daily_hint",
-    href: "/daily",
-  },
-  {
     icon: BrainCircuit,
     labelKey: "nav_brainstorm",
     hintKey: "nav_brainstorm_hint",
     href: "/brainstorm",
   },
   {
-    icon: Bot,
-    labelKey: "nav_dawn_agent",
-    hintKey: "nav_dawn_agent_hint",
-    href: "/dawn-agent",
-  },
-  {
-    icon: MessagesSquare,
-    labelKey: "nav_dawn_harness",
-    hintKey: "nav_dawn_harness_hint",
-    href: "/dawn-harness",
+    icon: Sparkles,
+    labelKey: "nav_ai_import",
+    hintKey: "nav_ai_import_hint",
+    href: "/knowledge/ai-import",
   },
 ];
 
@@ -130,15 +125,19 @@ function Highlight({ text, query }: { text: string; query: string }) {
   return <>{parts}</>;
 }
 
-export function Sidebar() {
+export function Sidebar({ cloud: initialCloud = false }: { cloud?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { t } = useUiPrefs();
+  const { t, locale } = useUiPrefs();
+  const reducedMotion = useReducedMotion();
   // 阅读详情页进入沉浸模式：隐藏全局导航，避免与同文件夹抽屉形成双侧栏
   const inReaderDetail = /^\/reading\/[^/]+/.test(pathname ?? "");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [clientCloud, setClientCloud] = useState(false);
+  const cloud = initialCloud || clientCloud;
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -146,6 +145,20 @@ export function Sidebar() {
     "loading" | "ready" | "syncing" | "error" | "disabled"
   >("loading");
   const resultsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (initialCloud) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (
+        document.querySelector(".app-shell")?.hasAttribute("data-cloud-readonly") ||
+        document.cookie.includes("dawnkb-mode=cloud") ||
+        window.location.search.includes("cloud=1")
+      ) {
+        setClientCloud(true);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialCloud]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -176,15 +189,23 @@ export function Sidebar() {
   // 打开面板即拉取（空查询返回最近更新），输入防抖 140ms 加权搜索
   useEffect(() => {
     if (!searchOpen) return;
+    // 每次查询变化都中止上一个请求，避免慢的旧响应覆盖新结果
+    const controller = new AbortController();
     const timer = setTimeout(() => {
       fetch(`/api/search?q=${encodeURIComponent(query.trim())}&limit=12`, {
         cache: "no-store",
+        signal: controller.signal,
       })
-        .then((response) => response.json())
-        .then((data: { hits: SearchHit[] }) => setHits(data.hits ?? []))
+        .then((response) => (response.ok ? response.json() : { hits: [] }))
+        .then((data: { hits?: SearchHit[] }) => {
+          if (!controller.signal.aborted) setHits(data.hits ?? []);
+        })
         .catch(() => {});
     }, 140);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [query, searchOpen]);
 
   const filteredItems = useMemo(() => {
@@ -256,6 +277,7 @@ export function Sidebar() {
           className="icon-button"
           onClick={() => setMobileOpen(true)}
           aria-label={t("open_nav")}
+          aria-expanded={mobileOpen}
         >
           <Menu aria-hidden="true" />
         </button>
@@ -319,6 +341,7 @@ export function Sidebar() {
             className="sidebar-collapse desktop-only"
             onClick={() => setCollapsed((current) => !current)}
             aria-label={collapsed ? t("expand_sidebar") : t("collapse_sidebar")}
+            aria-expanded={!collapsed}
           >
             {collapsed ? (
               <PanelLeftOpen aria-hidden="true" />
@@ -337,30 +360,39 @@ export function Sidebar() {
         </div>
 
         <nav className="sidebar-nav" aria-label="主要导航">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.map((item, index) => {
             const isActive =
               pathname === item.href ||
               (item.href !== "/dashboard" &&
                 pathname.startsWith(item.href.split("#")[0]));
 
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={collapsed ? t(item.labelKey) : undefined}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "sidebar-link",
-                  isActive && "sidebar-link--active",
+              <Fragment key={item.href}>
+                {(index === 0 || index === 5 || index === 7) && (
+                  <p className="sidebar-nav-label">{t(index === 0 ? "nav_group_knowledge" : index === 5 ? "nav_group_daily" : "nav_group_ai")}</p>
                 )}
-                aria-current={isActive ? "page" : undefined}
-              >
-                <item.icon aria-hidden="true" />
-                <span className="sidebar-link-copy">
-                  <span>{t(item.labelKey)}</span>
-                  <small>{t(item.hintKey)}</small>
-                </span>
-              </Link>
+                <Link
+                  href={item.href}
+                  title={`${t(item.labelKey)} · ${t(item.hintKey)}`}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "sidebar-link",
+                    isActive && "sidebar-link--active",
+                  )}
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  {isActive && <motion.span
+                    className="sidebar-link-selection"
+                    layoutId="sidebar-selection"
+                    transition={{ duration: reducedMotion ? 0 : 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    aria-hidden="true"
+                  />}
+                  <item.icon aria-hidden="true" />
+                  <span className="sidebar-link-copy">
+                    <span>{t(item.labelKey)}</span>
+                  </span>
+                </Link>
+              </Fragment>
             );
           })}
         </nav>
@@ -370,44 +402,79 @@ export function Sidebar() {
             type="button"
             className="command-button"
             onClick={() => setSearchOpen(true)}
+            aria-label={t("search_button")}
+            title={collapsed ? t("search_button") : undefined}
           >
-            <Search aria-hidden="true" />
-            <span>{t("search_button")}</span>
-            <kbd>⌘ K</kbd>
+            <Search className="command-button-icon" aria-hidden="true" />
+            <span className="command-button-text">{t("search_button")}</span>
+            <kbd className="command-button-kbd">⌘ K</kbd>
           </button>
           <PrefsMenu />
-          <Link
-            href="/settings"
-            className={cn(
-              "sidebar-link",
-              pathname === "/settings" && "sidebar-link--active",
-            )}
-            onClick={() => setMobileOpen(false)}
-          >
-            <Settings aria-hidden="true" />
-            <span className="sidebar-link-copy">
-              <span>{t("nav_settings")}</span>
-              <small>{t("nav_settings_hint")}</small>
-            </span>
-          </Link>
+          {!cloud && (
+            <Link
+              href="/settings"
+              className={cn(
+                "sidebar-link",
+                pathname === "/settings" && "sidebar-link--active",
+              )}
+              onClick={() => setMobileOpen(false)}
+            >
+              <Settings aria-hidden="true" />
+              <span className="sidebar-link-copy">
+                <span>{t("nav_settings")}</span>
+                <small>{t("nav_settings_hint")}</small>
+              </span>
+            </Link>
+          )}
           <div
-            className={`sync-state sync-state--${vaultState}`}
+            className={cn(
+              "sync-state",
+              `sync-state--${vaultState}`,
+              cloud && "sync-state--cloud",
+            )}
             title={
-              vaultState === "ready"
-                ? "Obsidian 保存后约半秒自动更新"
-                : "可在设置中检查同步状态"
+              cloud
+                ? (locale === "zh" ? "云端独立维护，已安全连接" : "Cloud vault active and secure")
+                : vaultState === "ready"
+                  ? "Obsidian 保存后约半秒自动更新"
+                  : "可在设置中检查同步状态"
             }
           >
-            <span className={`status-dot status-dot--${vaultState}`} />
-            <span>
-              {vaultState === "ready"
-                ? t("sync_ready")
-                : vaultState === "syncing" || vaultState === "loading"
-                  ? t("sync_syncing")
-                  : vaultState === "disabled"
-                    ? t("sync_disabled")
-                    : t("sync_error")}
-            </span>
+            <div className="sync-state-indicator">
+              <span className={cn("status-dot", `status-dot--${cloud ? "cloud" : vaultState}`)} />
+              <span className="sync-state-label">
+                {cloud
+                  ? (locale === "zh" ? "云端知识库" : "Cloud Vault")
+                  : vaultState === "ready"
+                    ? t("sync_ready")
+                    : vaultState === "syncing" || vaultState === "loading"
+                      ? t("sync_syncing")
+                      : vaultState === "disabled"
+                        ? t("sync_disabled")
+                        : t("sync_error")}
+              </span>
+            </div>
+            {cloud && (
+              <button
+                type="button"
+                className="cloud-logout-button"
+                title={locale === "zh" ? "退出登录" : "Sign Out"}
+                aria-label={locale === "zh" ? "退出登录" : "Sign Out"}
+                disabled={loggingOut}
+                onClick={async () => {
+                  setLoggingOut(true);
+                  try {
+                    await fetch("/api/auth/logout", { method: "POST" });
+                  } catch {}
+                  // 完整刷新，清理登录状态变化后缓存的私有页面。
+                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                  window.location.assign("/login");
+                }}
+              >
+                <LogOut className="cloud-logout-icon" aria-hidden="true" />
+                <span className="cloud-logout-text">{locale === "zh" ? "退出" : "Exit"}</span>
+              </button>
+            )}
           </div>
         </div>
       </aside>
@@ -507,9 +574,7 @@ export function Sidebar() {
                           ))}
                       </small>
                     </span>
-                    {query.trim() && (
-                      <span className="command-score">{hit.score}</span>
-                    )}
+                    <span className="command-enter" aria-hidden="true">↵</span>
                   </button>
                 );
               })}

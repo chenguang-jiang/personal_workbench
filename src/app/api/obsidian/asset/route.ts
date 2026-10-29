@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 import { getVaultConfig } from "@/lib/obsidian-sync";
+import { findVaultAssetByName } from "@/lib/vault-asset-index";
 
 export const runtime = "nodejs";
 
@@ -14,30 +15,6 @@ const CONTENT_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".bmp": "image/bmp",
 };
-
-/** `![[name.png]]` 不带目录时，按文件名在 vault 内查找。 */
-function findByName(root: string, name: string): string | null {
-  const stack: string[] = [root];
-  while (stack.length > 0) {
-    const dir = stack.pop() as string;
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      if (entry.name.startsWith(".")) continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(full);
-      } else if (entry.name === name) {
-        return full;
-      }
-    }
-  }
-  return null;
-}
 
 export async function GET(req: NextRequest) {
   const raw = req.nextUrl.searchParams.get("path")?.trim() || "";
@@ -67,17 +44,39 @@ export async function GET(req: NextRequest) {
     !fs.existsSync(/* turbopackIgnore: true */ filePath) ||
     !fs.statSync(/* turbopackIgnore: true */ filePath).isFile()
   ) {
-    const found = findByName(vaultPath, path.basename(normalized));
+    const found = await findVaultAssetByName(vaultPath, path.basename(normalized));
     if (!found)
       return NextResponse.json({ error: "资源不存在" }, { status: 404 });
     filePath = found;
   }
 
-  const data = fs.readFileSync(/* turbopackIgnore: true */ filePath);
-  return new NextResponse(new Uint8Array(data), {
-    headers: {
+  // 解析符号链接后再校验仍在 vault 内，防止 vault 内的软链指向外部文件
+  let realFile: string;
+  try {
+    const realRoot = fs.realpathSync(/* turbopackIgnore: true */ vaultPath);
+    realFile = fs.realpathSync(/* turbopackIgnore: true */ filePath);
+    const realRelative = path.relative(realRoot, realFile);
+    if (realRelative.startsWith("..") || path.isAbsolute(realRelative)) {
+      return NextResponse.json({ error: "非法路径" }, { status: 400 });
+    }
+  } catch {
+    return NextResponse.json({ error: "资源不存在" }, { status: 404 });
+  }
+
+  try {
+    const data = fs.readFileSync(/* turbopackIgnore: true */ realFile);
+    const headers: Record<string, string> = {
       "Content-Type": contentType,
-      "Cache-Control": "public, max-age=3600",
-    },
-  });
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+    };
+    // SVG 可内嵌脚本：直接打开时用 CSP + sandbox 禁止执行
+    if (ext === ".svg") {
+      headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+    }
+    return new NextResponse(new Uint8Array(data), { headers });
+  } catch (error) {
+    console.error("[obsidian/asset] 读取失败:", error);
+    return NextResponse.json({ error: "资源读取失败" }, { status: 500 });
+  }
 }

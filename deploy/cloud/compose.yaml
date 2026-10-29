@@ -1,0 +1,33 @@
+name: dawnkb
+services:
+  web:
+    image: dawnkb:cloud
+    container_name: dawnkb-web
+    restart: unless-stopped
+    init: true
+    env_file:
+      - /srv/dawnkb/app.env
+    ports:
+      - "127.0.0.1:3010:3000"
+    volumes:
+      - /srv/dawnkb/vault:/data/vault
+      - /srv/dawnkb/versions:/data/versions
+    networks:
+      - private
+    mem_limit: 768m
+    cpus: 1.0
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+networks:
+  private:
+    external: true
+    name: dawnkb-private

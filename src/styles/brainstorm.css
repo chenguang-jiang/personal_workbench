@@ -1,0 +1,736 @@
+/* ── 头脑风暴 ── */
+.bs-start {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 15px;
+  margin-top: 12px;
+}
+
+.bs-start-label {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: none;
+}
+
+.bs-plus {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklab, var(--color-primary) 30%, transparent);
+  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+  color: var(--color-primary);
+}
+
+.bs-start-label h2 {
+  font-size: 16px;
+  font-weight: 750;
+  margin: 2px 0 0;
+}
+
+.bs-question {
+  flex: 1;
+  resize: vertical;
+  min-height: 44px;
+}
+
+.bs-layout {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: 214px minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+  align-items: stretch;
+}
+
+.bs-history {
+  height: 100%;
+  min-height: 0;
+  padding: 13px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.bs-history-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.bs-history-item {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.bs-history-main {
+  display: block;
+  width: 100%;
+  padding: 10px 38px 10px 12px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bs-history-item:hover {
+  background: color-mix(in oklab, var(--color-primary) 5%, transparent);
+}
+
+.bs-history-item.active {
+  border-color: color-mix(
+    in oklab,
+    var(--color-primary) 24%,
+    var(--color-border)
+  );
+  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+}
+
+.bs-history-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-tertiary);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.bs-history-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-tertiary);
+  opacity: 0;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.bs-history-item:hover .bs-history-delete,
+.bs-history-delete:focus-visible {
+  opacity: 0.8;
+}
+
+.bs-history-item strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bs-history-item small {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-tertiary);
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+}
+
+.bs-session {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(360px, 1fr) 300px;
+  grid-template-rows: auto auto auto auto minmax(170px, 1fr) auto;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.bs-session > .micro-label {
+  grid-column: 1;
+  grid-row: 1;
+  padding: 17px 20px 0;
+}
+
+.bs-session > .bs-session-question {
+  grid-column: 1;
+  grid-row: 2;
+  padding: 0 20px;
+}
+
+.bs-session > .bs-stats {
+  grid-column: 1;
+  grid-row: 3;
+  margin: 0 20px;
+}
+
+.bs-session > .bs-next-step {
+  grid-column: 1;
+  grid-row: 4;
+  margin: 10px 20px 7px;
+}
+
+.bs-session-board {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  grid-column: 2;
+  grid-row: 1 / 7;
+  flex-direction: column;
+  gap: 16px;
+  padding: 15px 13px 20px;
+  overflow-y: auto;
+  border-left: 1px solid var(--color-border);
+  background: color-mix(
+    in oklab,
+    var(--color-elevated) 45%,
+    var(--color-surface)
+  );
+}
+
+.bs-session > .bs-thread {
+  min-height: 0;
+  grid-column: 1;
+  grid-row: 5;
+  padding: 9px 20px 12px;
+}
+
+.bs-session > .ai-composer {
+  grid-column: 1;
+  grid-row: 6;
+  margin: 0 16px 16px;
+}
+
+.bs-session > .bs-empty {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+}
+
+.bs-session-board .bs-refs-block {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.bs-session-board .bs-block {
+  gap: 8px;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.bs-session-board .bs-block-head {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bs-session-board .bs-block-actions,
+.bs-session-board .bs-route-input {
+  width: 100%;
+}
+
+.bs-session-board .bs-block-actions {
+  align-items: stretch;
+}
+
+.bs-session-board .bs-route-input {
+  min-width: 0;
+}
+
+.bs-session-board .bs-route {
+  position: relative;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 6px 8px;
+  padding: 10px;
+}
+
+.bs-session-board .bs-route-text {
+  padding-right: 16px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.bs-session-board .bs-route .bs-chip {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.bs-session-board .bs-route .bs-card-delete {
+  position: absolute;
+  top: 9px;
+  right: 8px;
+}
+
+.bs-session-board .bs-props {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.bs-session-board .bs-prop {
+  padding: 11px;
+}
+
+.bs-session-board .bs-prop-text {
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.bs-session-board .bs-note {
+  align-items: flex-start;
+  font-size: 12px;
+}
+
+.bs-session-board .bs-prop-actions {
+  gap: 5px;
+}
+
+.bs-session-board .bs-mini-btn {
+  padding: 4px 8px;
+  font-size: 11.5px;
+}
+
+.bs-empty {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-tertiary);
+}
+
+.bs-empty svg {
+  width: 40px;
+  height: 40px;
+  opacity: 0.4;
+}
+
+.bs-session-question {
+  font-size: 19px;
+  font-weight: 750;
+  margin: 2px 0 0;
+}
+
+.bs-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.bs-stats > div {
+  padding: 9px 10px;
+  border-right: 1px solid var(--color-border);
+}
+
+.bs-stats > div:last-child {
+  border-right: 0;
+}
+
+.bs-stats span {
+  display: block;
+  color: var(--color-tertiary);
+  font-size: 12.5px;
+  margin-bottom: 4px;
+}
+
+.bs-stats strong {
+  font-size: 15px;
+}
+
+.bs-propositions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bs-proposition {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--color-primary) 35%, transparent);
+  background: color-mix(in oklab, var(--color-primary) 7%, transparent);
+  color: var(--color-primary);
+  font-size: 11.5px;
+  padding: 5px 12px;
+}
+
+.bs-proposition svg {
+  width: 11px;
+  height: 11px;
+}
+
+.bs-proposition button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.bs-proposition button:hover {
+  opacity: 1;
+}
+
+.bs-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 2px;
+  scroll-behavior: smooth;
+}
+
+.bs-ai-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.bs-confirm-prop {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-tertiary);
+  font-size: 12.5px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.bs-confirm-prop:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.bs-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@container app-content (max-width: 960px) {
+  .bs-layout {
+    grid-template-columns: 1fr;
+  }
+  .bs-history {
+    height: auto;
+    min-height: 0;
+    max-height: 260px;
+  }
+  .bs-session {
+    height: auto;
+    min-height: 680px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(260px, 1fr) auto auto;
+    overflow: visible;
+  }
+  .bs-session-board {
+    max-height: 520px;
+    grid-column: 1;
+    grid-row: 7;
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
+  }
+  .bs-session > .bs-thread {
+    grid-row: 5;
+  }
+  .bs-session > .ai-composer {
+    grid-row: 6;
+  }
+  .bs-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .bs-stats > div:nth-child(2) {
+    border-right: 0;
+  }
+  .bs-start {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ── 头脑风暴：参考资料 / 选择器 / 修订弹窗 ── */
+button.bs-plus {
+  cursor: pointer;
+  border: 1px dashed var(--color-border-strong);
+  background: transparent;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+button.bs-plus:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 6%, transparent);
+}
+
+.bs-refs-block {
+  margin-top: 2px;
+}
+
+.bs-refs-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bs-ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 10px;
+  border: 1px solid
+    color-mix(
+      in oklab,
+      var(--color-accent-green) 35%,
+      var(--color-border)
+    );
+  background: color-mix(
+    in oklab,
+    var(--color-accent-green) 8%,
+    transparent
+  );
+  color: var(--color-primary);
+  font-size: 11.5px;
+  padding: 5px 10px;
+  max-width: 100%;
+}
+
+.bs-ref-chip > svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  opacity: 0.75;
+}
+
+.bs-ref-chip > button,
+.bs-ref-chip > a {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  padding: 1px;
+  display: grid;
+  place-items: center;
+}
+
+.bs-ref-chip > button:hover,
+.bs-ref-chip > a:hover {
+  opacity: 1;
+}
+
+.bs-ref-chip svg {
+  width: 11px;
+  height: 11px;
+}
+
+.bs-start .bs-refs-row {
+  margin-top: 10px;
+}
+
+.status-dot--off {
+  background: #b3261e;
+  box-shadow: 0 0 0 3px color-mix(in oklab, #b3261e 18%, transparent);
+}
+
+.bs-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: color-mix(in oklab, var(--color-primary) 24%, transparent);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.bs-modal {
+  width: min(560px, 100%);
+  max-height: min(72vh, 640px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-elevated);
+  box-shadow: 0 24px 64px rgba(10, 6, 24, 0.28);
+  padding: 18px 20px;
+  gap: 12px;
+}
+
+.bs-modal--wide {
+  width: min(880px, 100%);
+}
+
+.bs-modal--center {
+  width: auto;
+  align-items: center;
+  gap: 10px;
+  padding: 26px 34px;
+  color: var(--color-secondary);
+}
+
+.bs-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bs-modal-head h3 {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.bs-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bs-picker-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bs-picker-tabs button {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 12px;
+  padding: 5px 14px;
+  cursor: pointer;
+}
+
+.bs-picker-tabs button.active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+}
+
+.bs-picker-search {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 12px;
+  padding: 6px 14px;
+  outline: none;
+}
+
+.bs-picker-search:focus {
+  border-color: var(--color-primary);
+}
+
+.bs-picker-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.bs-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 12.5px;
+  text-align: left;
+  padding: 8px 10px;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bs-picker-item:hover {
+  background: color-mix(in oklab, var(--color-primary) 6%, transparent);
+}
+
+.bs-picker-item svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  opacity: 0.6;
+}
+
+.bs-revise-editor {
+  flex: 1;
+  min-height: 320px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  resize: none;
+}
+
+/* ── 头脑风暴开始卡：参考芯片不挤压输入框 ── */
+.bs-start {
+  flex-wrap: wrap;
+}
+
+.bs-start .bs-question {
+  min-width: 240px;
+}
+
+.bs-refs-row--start {
+  flex-basis: 100%;
+  order: 9;
+  align-items: center;
+}
+
+.bs-refs-label {
+  color: var(--color-tertiary);
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  flex: none;
+}
+
+.bs-ref-chip {
+  max-width: 280px;
+}
+
+.bs-ref-chip-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}

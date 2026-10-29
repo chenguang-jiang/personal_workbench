@@ -1,0 +1,10 @@
+# 仅在运行依赖版本兼容时更新构建产物，部署前先将当前镜像标为 dawnkb:previous。
+FROM dawnkb:previous
+ARG DAWNKB_UPSTREAM_REVISION=unknown
+LABEL cn.chenguangjiang.dawnkb.upstream-revision=$DAWNKB_UPSTREAM_REVISION
+COPY --chown=node:node .next /app/.next
+COPY --chown=node:node public /app/public
+COPY --chown=node:node package.json package-lock.json next.config.ts prisma.config.ts /app/
+# schema/迁移有变化时同步进镜像并重新生成客户端（prisma CLI 已在镜像内；generate 不连库，dummy URL 仅供 config 读取）
+COPY --chown=node:node prisma /app/prisma
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate

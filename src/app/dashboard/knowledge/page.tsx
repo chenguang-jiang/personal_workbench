@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import type { Edge as VisEdge, Node as VisNode } from "vis-network";
 import { ArrowUpRight, FileText, Search, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -11,6 +12,7 @@ interface GraphNode {
   label: string;
   group: string;
   tags: string[];
+  articleId?: string | null;
 }
 
 interface GraphEdge {
@@ -20,6 +22,7 @@ interface GraphEdge {
 }
 
 type GraphPayload = { nodes: GraphNode[]; edges: GraphEdge[] };
+type NodeDataHandle = { update: (items: Array<{ id: string; hidden: boolean }>) => unknown };
 type NetworkHandle = {
   destroy: () => void;
   selectNodes: (ids: string[]) => void;
@@ -45,27 +48,50 @@ export default function KnowledgeGraphPage() {
   const { t } = useUiPrefs();
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<NetworkHandle | null>(null);
+  const nodesDataRef = useRef<NodeDataHandle | null>(null);
   const [payload, setPayload] = useState<GraphPayload>({ nodes: [], edges: [] });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState("all");
+  const groupRef = useRef(group);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     fetch("/api/graph?limit=500")
-      .then((response) => response.json())
-      .then((data: GraphPayload) => {
-        if (active) setPayload(data);
+      .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
+          throw new Error((data && typeof data.error === "string" && data.error) || `HTTP ${response.status}`);
+        }
+        return data as GraphPayload;
       })
-      .catch((error) => console.error("图谱加载失败:", error))
+      .then((data) => {
+        if (!active) return;
+        setLoadError("");
+        setPayload(data);
+      })
+      .catch((error) => {
+        console.error("图谱加载失败:", error);
+        if (active) setLoadError(error instanceof Error ? error.message : "图谱加载失败");
+      })
       .finally(() => {
         if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
+
+  // 切换分组只更新节点 hidden 标记，不销毁重建网络（保留布局与缩放）
+  useEffect(() => {
+    groupRef.current = group;
+    nodesDataRef.current?.update(
+      payload.nodes.map((node) => ({ id: node.id, hidden: group !== "all" && node.group !== group })),
+    );
+  }, [group, payload.nodes]);
 
   useEffect(() => {
     if (!containerRef.current || payload.nodes.length === 0) return;
@@ -81,7 +107,7 @@ export default function KnowledgeGraphPage() {
           id: node.id,
           label: node.label.length > 18 ? `${node.label.slice(0, 17)}…` : node.label,
           group: node.group,
-          hidden: group !== "all" && node.group !== group,
+          hidden: groupRef.current !== "all" && node.group !== groupRef.current,
           color: {
             background: GROUP_COLORS[node.group] || "#6e35d9",
             border: "#ffffff",
@@ -127,6 +153,7 @@ export default function KnowledgeGraphPage() {
 
       instance.on("selectNode", (params) => setSelectedId(String(params.nodes[0])));
       networkRef.current = instance as unknown as NetworkHandle;
+      nodesDataRef.current = nodes;
     }
 
     renderNetwork();
@@ -134,8 +161,9 @@ export default function KnowledgeGraphPage() {
       cancelled = true;
       networkRef.current?.destroy();
       networkRef.current = null;
+      nodesDataRef.current = null;
     };
-  }, [group, payload]);
+  }, [payload]);
 
   const selectedNode = useMemo(
     () => payload.nodes.find((node) => node.id === selectedId) ?? payload.nodes[0] ?? null,
@@ -220,6 +248,22 @@ export default function KnowledgeGraphPage() {
               <span className="status-dot" /> 正在构建关系网络…
             </div>
           )}
+          {!loading && loadError && (
+            <div className="graph-loading" role="alert">
+              图谱加载失败：{loadError}
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => {
+                  setLoading(true);
+                  setLoadError("");
+                  setReloadKey((key) => key + 1);
+                }}
+              >
+                重试
+              </button>
+            </div>
+          )}
         </div>
 
         <aside className="graph-detail">
@@ -233,6 +277,11 @@ export default function KnowledgeGraphPage() {
               <div className="graph-tags">
                 {selectedNode.tags.slice(0, 4).map((tag) => <span key={tag}>#{tag}</span>)}
               </div>
+              {selectedNode.articleId && (
+                <Link href={`/reading/${selectedNode.articleId}`} className="button button-secondary">
+                  <FileText aria-hidden="true" /> 打开文档
+                </Link>
+              )}
               <p className="graph-related-title">相关页面 · {relatedNodes.length}</p>
               {relatedNodes.length > 0 ? (
                 <div className="graph-related-list">

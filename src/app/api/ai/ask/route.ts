@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatAboutArticle, getAiStatus, type ChatTurn } from "@/lib/ai";
+import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 // POST /api/ai/ask — 围绕文章的多轮流式问答
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as {
+  const body = await readJsonObject<{
     articleTitle?: string;
     articleContent?: string;
     selection?: string;
     history?: ChatTurn[];
-  };
+  }>(req);
+  if (!body) return invalidJsonResponse();
 
   const history = Array.isArray(body.history) ? body.history : [];
   if (!body.articleTitle || history.length === 0 || history[history.length - 1].role !== "user") {

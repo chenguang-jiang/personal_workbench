@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseKnowledgeScope } from "@/lib/knowledge-grounding";
+import { invalidJsonResponse, readJsonObject } from "@/lib/request-body";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const body = (await req.json()) as {
+  const body = await readJsonObject<{
     name?: string;
     description?: string | null;
     scope?: unknown;
     isDefault?: boolean;
-  };
+  }>(req);
+  if (!body) return invalidJsonResponse();
   if (body.isDefault) await prisma.knowledgeSpace.updateMany({ data: { isDefault: false } });
   const space = await prisma.knowledgeSpace.update({
     where: { id },

@@ -45,3 +45,4 @@ next-env.d.ts
 # 本地生成产物/日志
 /output/
 .impeccable/
+.zcode/

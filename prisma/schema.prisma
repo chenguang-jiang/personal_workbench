@@ -102,6 +102,8 @@ model Article {
   tags            String[]
   readingProgress Float            @default(0) // 0-100
   lastReadAt      DateTime?
+  favoritedAt     DateTime? // 收藏夹：非空即已收藏，收藏夹按它倒序
+  shareToken      String?          @unique // 公开分享令牌：非空即开启分享，/s/<token> 免登录只读访问
   isDailyDigest   Boolean          @default(false)
   userId          String
   user            User             @relation(fields: [userId], references: [id])
@@ -320,119 +322,4 @@ model KnowledgeChunk {
   @@index([articleId])
   @@index([vaultPath])
   @@index([contentHash])
-}
-
-// ===== Dawn Agent：本地项目、会话时间线与人工审批 =====
-model DawnAgentProject {
-  id           String   @id @default(cuid())
-  name         String
-  rootPath     String
-  realPath     String   @unique
-  trustLevel   String   @default("standard") // standard | elevated
-  enabled      Boolean  @default(true)
-  lastOpenedAt DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  sessions DawnAgentSession[]
-  memories DawnAgentMemory[]
-  handoffs DawnAgentHandoff[]
-
-  @@index([lastOpenedAt])
-}
-
-model DawnAgentSession {
-  id             String           @id @default(cuid())
-  projectId      String
-  project        DawnAgentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  title          String
-  status         String           @default("idle") // idle | running | awaiting_approval | stopped | error
-  piSessionFile  String?
-  model          String?
-  thinkingLevel  String           @default("high")
-  permissionMode String           @default("supervised") // supervised | full_control
-  summary        String?          @db.Text
-  context        Json? // 从阅读、知识库或头脑风暴交接来的可追溯上下文
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-
-  events    DawnAgentEvent[]
-  approvals DawnAgentApproval[]
-  handoffs  DawnAgentHandoff[]
-
-  @@index([projectId, updatedAt])
-  @@index([status])
-}
-
-model DawnAgentEvent {
-  id        String           @id @default(cuid())
-  sessionId String
-  session   DawnAgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sequence  Int
-  type      String // user | assistant | tool_start | tool_update | tool_end | status | error
-  payload   Json
-  createdAt DateTime         @default(now())
-
-  @@unique([sessionId, sequence])
-  @@index([sessionId, createdAt])
-}
-
-model DawnAgentApproval {
-  id            String           @id @default(cuid())
-  sessionId     String
-  session       DawnAgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  toolCallId    String
-  toolName      String
-  riskLevel     String           @default("medium")
-  arguments     Json
-  preview       Json? // 文件修改前后对比；不保存未截断的完整敏感内容
-  selectedHunks Json? // edit 工具允许用户只批准部分编辑块
-  summary       String
-  status        String           @default("pending") // pending | approved | denied | expired
-  decidedAt     DateTime?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-
-  @@unique([sessionId, toolCallId])
-  @@index([sessionId, status])
-}
-
-model DawnAgentMemory {
-  id         String           @id @default(cuid())
-  projectId  String
-  project    DawnAgentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  title      String
-  content    String           @db.Text
-  kind       String           @default("fact") // fact | decision | preference | workflow
-  sourceType String           @default("manual") // manual | session | knowledge | handoff
-  sourceRef  String?
-  enabled    Boolean          @default(true)
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
-
-  @@index([projectId, enabled, updatedAt])
-}
-
-model DawnAgentHandoff {
-  id           String            @id @default(cuid())
-  sourceType   String // reading-selection | reading-document | knowledge | reasoning
-  sourceTitle  String
-  sourcePath   String?
-  sourceRef    String?
-  selectedText String?           @db.Text
-  context      String?           @db.Text
-  instruction  String?           @db.Text
-  metadata     Json?
-  status       String            @default("pending") // pending | accepted | dismissed
-  projectId    String?
-  project      DawnAgentProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  sessionId    String?
-  session      DawnAgentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  acceptedAt   DateTime?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-
-  @@index([status, createdAt])
-  @@index([projectId, createdAt])
-  @@index([sessionId])
 }

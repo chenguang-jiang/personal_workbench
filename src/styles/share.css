@@ -1,0 +1,272 @@
+/* 免登录分享页：独立于工作台外壳，只保留顶栏 + 文档主体。
+   正文复用 .reader-prose 排版，这里只写页面骨架。 */
+.share-page {
+  min-height: 100vh;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.share-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 24px;
+  background: color-mix(in oklab, var(--color-surface) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-secondary);
+}
+
+.share-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.share-logo {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+}
+
+.share-logo svg {
+  width: 100%;
+  height: 100%;
+}
+
+.share-copy-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.share-copy-link:hover {
+  border-color: var(--color-accent-purple);
+  color: var(--color-accent-purple);
+}
+
+.share-copy-link svg {
+  width: 13px;
+  height: 13px;
+}
+
+.share-document {
+  width: min(760px, 100% - 48px);
+  margin: 0 auto;
+  padding: 40px 0 64px;
+}
+
+.share-intro {
+  margin-bottom: 28px;
+}
+
+.share-title {
+  margin: 0 0 12px;
+  font-size: 30px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.share-summary {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-secondary);
+}
+
+.share-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-tertiary);
+}
+
+.share-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.share-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-accent-lilac);
+  color: var(--color-accent-purple-dark);
+  font-size: 11px;
+}
+
+.share-footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--color-border);
+  font-size: 12px;
+  color: var(--color-tertiary);
+  text-align: center;
+}
+
+.share-footer p {
+  margin: 0;
+}
+
+/* 分享不存在 / 已关闭 */
+.share-page--missing {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.share-missing-card {
+  max-width: 420px;
+  padding: 40px 32px;
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+.share-missing-card .share-logo {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 16px;
+}
+
+.share-missing-card h1 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: var(--color-primary);
+}
+
+.share-missing-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-secondary);
+}
+
+@media (max-width: 640px) {
+  .share-document {
+    width: 100% - 32px;
+    padding-top: 24px;
+  }
+
+  .share-title {
+    font-size: 24px;
+  }
+}
+
+/* 分享弹窗：复用 confirm-dialog 骨架，只调整图标配色与链接行 */
+.share-dialog {
+  position: relative;
+}
+
+.share-dialog .confirm-dialog-icon {
+  border-color: color-mix(in oklab, var(--color-accent-purple) 30%, transparent);
+  background: color-mix(in oklab, var(--color-accent-purple) 10%, var(--color-surface));
+  color: var(--color-accent-purple);
+}
+
+.share-dialog-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-tertiary);
+  cursor: pointer;
+}
+
+.share-dialog-close:hover {
+  background: var(--color-hover);
+  color: var(--color-primary);
+}
+
+.share-dialog-close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.share-dialog-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  color: var(--color-tertiary);
+  font-size: 12.5px;
+}
+
+.share-dialog-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-elevated);
+  padding: 8px 10px;
+  margin-bottom: 16px;
+}
+
+.share-dialog-link > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--color-tertiary);
+}
+
+.share-dialog-link input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.share-dialog-link input:focus {
+  outline: none;
+}
+
+.share-dialog-link .button {
+  flex: none;
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.share-dialog-link .button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.share-dialog-hint {
+  margin: 12px 0 0;
+  color: var(--color-tertiary);
+  font-size: 11.5px;
+  line-height: 1.6;
+}

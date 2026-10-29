@@ -1,0 +1,646 @@
+/* ── 头脑风暴：区块 / 路线 / 台账 完整样式 ── */
+.bs-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.bs-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bs-block-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.bs-block-head h3 svg {
+  width: 15px;
+  height: 15px;
+}
+
+.bs-block-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bs-block-empty {
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 12px;
+  color: var(--color-tertiary);
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 12px 16px;
+}
+
+.bs-route-input {
+  width: 220px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 11.5px;
+  padding: 6px 12px;
+  outline: none;
+}
+
+.bs-route-input:focus {
+  border-color: var(--color-primary);
+}
+
+.bs-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 11px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+  white-space: nowrap;
+}
+
+.bs-mini-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.bs-mini-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bs-mini-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.bs-mini-btn--accent {
+  color: var(--color-primary);
+  border-color: color-mix(in oklab, var(--color-primary) 40%, transparent);
+  background: color-mix(in oklab, var(--color-primary) 6%, transparent);
+}
+
+.bs-route {
+  display: grid;
+  grid-template-columns: 44px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-elevated);
+  padding: 12px 16px;
+  transition: border-color 120ms ease;
+}
+
+.bs-route:hover {
+  border-color: var(--color-border-strong);
+}
+
+.bs-route-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-tertiary);
+  letter-spacing: 0.04em;
+}
+
+.bs-route-text {
+  font-size: 13.5px;
+  font-weight: 550;
+  line-height: 1.6;
+  color: var(--color-primary);
+}
+
+.bs-chip {
+  border: 0;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  background: color-mix(in oklab, var(--color-tertiary) 14%, transparent);
+  color: var(--color-secondary);
+}
+
+.bs-chip--exploring {
+  background: color-mix(in oklab, #2f6fdb 14%, transparent);
+  color: #2f6fdb;
+}
+
+.bs-chip--completed {
+  background: color-mix(in oklab, var(--color-success) 16%, transparent);
+  color: #227a52;
+}
+
+.bs-chip--supported-with-gaps {
+  background: color-mix(in oklab, #d9822b 16%, transparent);
+  color: #a05e14;
+}
+
+.bs-chip--user-confirmed {
+  background: color-mix(in oklab, var(--color-success) 16%, transparent);
+  color: #227a52;
+}
+
+.bs-chip--revised {
+  background: color-mix(in oklab, #7c5cd6 16%, transparent);
+  color: #5b3fb0;
+}
+
+.bs-card-delete {
+  border: 0;
+  background: transparent;
+  color: var(--color-tertiary);
+  opacity: 0;
+  cursor: pointer;
+  padding: 2px;
+  display: grid;
+  place-items: center;
+  transition: opacity 120ms ease;
+}
+
+.bs-route:hover .bs-card-delete,
+.bs-prop:hover .bs-card-delete {
+  opacity: 0.8;
+}
+
+.bs-card-delete svg {
+  width: 13px;
+  height: 13px;
+}
+
+.bs-props {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.bs-prop {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-elevated);
+  padding: 14px 16px;
+  transition: border-color 120ms ease;
+}
+
+.bs-prop:hover {
+  border-color: var(--color-border-strong);
+}
+
+.bs-prop-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bs-prop-head .bs-card-delete {
+  margin-left: auto;
+}
+
+.bs-prop-text {
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.75;
+  color: var(--color-primary);
+}
+
+.bs-note {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--color-secondary);
+}
+
+.bs-note > span {
+  flex: none;
+  color: var(--color-tertiary);
+}
+
+.bs-note em {
+  color: var(--color-tertiary);
+  font-style: italic;
+}
+
+.bs-note > button {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--color-tertiary);
+  cursor: pointer;
+  padding: 1px;
+  display: grid;
+  place-items: center;
+  align-self: center;
+}
+
+.bs-note > button:hover {
+  color: var(--color-primary);
+}
+
+.bs-note > button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.bs-note-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bs-note-edit .textarea {
+  font-size: 12px;
+}
+
+.bs-note-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.bs-prop-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.bs-next-step {
+  color: var(--color-tertiary);
+  font-size: 12px;
+}
+
+.bs-next-step strong {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.bs-history-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--color-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+  margin-top: 4px;
+}
+
+.bs-guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.bs-guide-step {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.bs-guide-step > span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bs-guide-step strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+
+.bs-guide-step p {
+  color: var(--color-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+@media (max-width: 1100px) {
+  .bs-props {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bs-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reader-edit-hint--ok {
+  border-color: color-mix(in oklab, var(--color-success) 45%, transparent);
+  color: #227a52;
+  background: color-mix(in oklab, var(--color-success) 10%, var(--color-elevated));
+  /* 保存成功是一次确认时刻：小幅弹出一次，替代编辑提示条的滑入 */
+  animation: saved-pop 260ms var(--ease-panel) both;
+}
+
+.panel-sub {
+  color: var(--color-tertiary);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+/* ── 批注回标：正文里的虚线下划线，点击打开标注台 ── */
+.note-mark {
+  background: linear-gradient(
+    transparent 64%,
+    color-mix(in srgb, var(--color-accent-purple) 20%, transparent) 0
+  );
+  border-bottom: 2px dotted var(--color-accent-purple);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.citation-focus-mark {
+  padding: 1px 2px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--color-accent-amber) 32%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in oklab, var(--color-accent-amber) 20%, transparent);
+  scroll-margin-block: 28vh;
+  animation: citation-focus-pulse 900ms var(--ease-out-expo) 2 alternate;
+}
+
+@keyframes citation-focus-pulse {
+  from {
+    background: color-mix(in oklab, var(--color-accent-amber) 22%, transparent);
+    box-shadow: 0 0 0 2px
+      color-mix(in oklab, var(--color-accent-amber) 16%, transparent);
+  }
+  to {
+    background: color-mix(in oklab, var(--color-accent-amber) 48%, transparent);
+    box-shadow: 0 0 0 6px
+      color-mix(in oklab, var(--color-accent-amber) 8%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .citation-focus-mark {
+    animation: none;
+  }
+}
+
+/* ── 已保存列表：筛选切换与删除按钮 ── */
+.saved-heading-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.saved-filter {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+}
+.saved-filter-btn {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11.5px;
+  color: var(--color-tertiary);
+  cursor: pointer;
+}
+.saved-filter-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.saved-filter-btn--on {
+  background: var(--color-accent-purple);
+  color: #fff;
+}
+.saved-highlight,
+.annotation-note {
+  position: relative;
+}
+.saved-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+.saved-delete svg {
+  width: 13px;
+  height: 13px;
+}
+.saved-highlight:hover .saved-delete,
+.annotation-note:hover .saved-delete,
+.saved-delete:focus-visible {
+  opacity: 1;
+}
+.saved-delete:hover {
+  background: color-mix(in oklab, #ef4444 12%, transparent);
+  color: #ef4444;
+}
+
+/* ── 头脑风暴：写回说明与写回记录 ── */
+.bs-under-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.bs-write-hint {
+  margin: 0 2px;
+  color: var(--color-tertiary);
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: center;
+}
+.bs-linklike {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-accent-purple-dark);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.bs-linklike:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.bs-increment-log {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 0;
+}
+.bs-increment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--color-secondary);
+  cursor: pointer;
+}
+.bs-increment-chip svg {
+  width: 11px;
+  height: 11px;
+  color: var(--color-accent-purple);
+}
+.bs-increment-chip:hover {
+  border-color: var(--color-accent-purple);
+  color: var(--color-accent-purple-dark);
+}
+
+/* ── 头脑风暴：写回同时整理回原文开关 ── */
+.bs-integrate-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: auto;
+  color: var(--color-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.bs-integrate-toggle input {
+  width: 12px;
+  height: 12px;
+  accent-color: var(--color-accent-purple);
+  cursor: pointer;
+}
+
+/* ── 阅读器：整理后撤销按钮 ── */
+.reader-undo-btn {
+  margin-left: 10px;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--color-accent-purple) 16%, transparent);
+  color: var(--color-accent-purple-dark);
+  padding: 2px 9px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.reader-undo-btn:hover {
+  background: color-mix(in oklab, var(--color-accent-purple) 26%, transparent);
+}
+
+/* ── 头脑风暴：AI 角度一键操作 ── */
+.bs-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.bs-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: color-mix(in oklab, var(--color-accent-purple) 4%, transparent);
+}
+.bs-option-label {
+  flex: 1;
+  min-width: 150px;
+  font-size: 11px;
+  color: var(--color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bs-option-label em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--color-accent-purple-dark);
+  margin-right: 5px;
+}
+.bs-option-acts {
+  display: flex;
+  gap: 6px;
+}
+.bs-option-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+.bs-option-act svg {
+  width: 11px;
+  height: 11px;
+}
+.bs-option-act:hover {
+  color: var(--color-accent-purple-dark);
+  border-color: var(--color-accent-purple);
+}
+.bs-option-act--pick {
+  color: var(--color-accent-purple-dark);
+  border-color: var(--color-accent-purple);
+}
+.bs-option-act:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
