@@ -384,64 +384,67 @@ export function ReaderAiChat({
           </button>
         </div>
 
-        {(attachments.length > 0 || attaching) && (
-          <div className="ai-chat-attach-bar">
-            {attaching && (
-              <span className="ai-chat-attach-pending">
-                <Loader2 size={13} className="ai-spinner" aria-hidden="true" />
-                <span>附件处理中…</span>
-              </span>
-            )}
-            {attachments.map((att) => (
-              <span key={att.id} className="ai-chat-attach-chip">
-                {att.type === "image" && att.preview ? (
-                  <img src={att.preview} alt={att.name} />
-                ) : (
-                  <FileText size={13} aria-hidden="true" />
-                )}
-                <span className="ai-chat-attach-name" title={att.name}>
-                  {att.name}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`移除附件 ${att.name}`}
-                  onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== att.id))}
-                  disabled={streaming || proposing || applying}
-                >
-                  <X size={11} aria-hidden="true" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-
         <form
+          className="ai-chat-box"
           onSubmit={(event) => {
             event.preventDefault();
             void send(input);
           }}
         >
-          <div className="ai-chat-input-row">
-            <textarea
-              className="textarea ai-input"
-              value={input}
-              rows={2}
-              placeholder={
-                mode === "ask"
-                  ? quoted?.text
-                    ? "针对引用的原文提问，可附加图片/文档…"
-                    : "问这篇文章相关的问题，可附加图片/文档…"
-                  : "说明要怎么修改，可结合上传的图片或文档附件…"
+          {/* 附件展示条 */}
+          {(attachments.length > 0 || attaching) && (
+            <div className="ai-chat-attach-bar">
+              {attaching && (
+                <span className="ai-chat-attach-pending">
+                  <Loader2 size={13} className="ai-spinner" aria-hidden="true" />
+                  <span>附件处理中…</span>
+                </span>
+              )}
+              {attachments.map((att) => (
+                <span key={att.id} className="ai-chat-attach-chip">
+                  {att.type === "image" && att.preview ? (
+                    <img src={att.preview} alt={att.name} />
+                  ) : (
+                    <FileText size={13} aria-hidden="true" />
+                  )}
+                  <span className="ai-chat-attach-name" title={att.name}>
+                    {att.name}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`移除附件 ${att.name}`}
+                    onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== att.id))}
+                    disabled={streaming || proposing || applying}
+                  >
+                    <X size={11} aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <textarea
+            className="ai-chat-textarea"
+            value={input}
+            rows={2}
+            placeholder={
+              mode === "ask"
+                ? quoted?.text
+                  ? "针对引用的原文提问，可附加图片/文档…"
+                  : "问这篇文章相关的问题，可附加图片/文档…"
+                : "说明要怎么修改，可结合上传的图片或文档附件…"
+            }
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                void send(input);
               }
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void send(input);
-                }
-              }}
-            />
-            <div className="ai-chat-actions">
+            }}
+          />
+
+          <div className="ai-chat-bottom-bar">
+            <div className="ai-chat-left-actions">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -456,7 +459,7 @@ export function ReaderAiChat({
               />
               <button
                 type="button"
-                className="button button-secondary ai-attach-btn"
+                className="ai-chat-tool-btn"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={streaming || proposing || applying || attaching || attachments.length >= 4}
                 title="上传图片或文档附件（辅助修改或问答）"
@@ -468,16 +471,17 @@ export function ReaderAiChat({
                   <Paperclip size={15} aria-hidden="true" />
                 )}
               </button>
-              <button type="submit" className="button ai-send" disabled={!canSend} aria-label="发送">
-                {streaming || proposing ? (
-                  <Loader2 className="ai-spinner" aria-hidden="true" />
-                ) : mode === "edit" ? (
-                  <PenLine aria-hidden="true" />
-                ) : (
-                  <ArrowUp aria-hidden="true" />
-                )}
-              </button>
             </div>
+
+            <button type="submit" className="ai-chat-submit-btn" disabled={!canSend} aria-label="发送">
+              {streaming || proposing ? (
+                <Loader2 size={14} className="ai-spinner" aria-hidden="true" />
+              ) : mode === "edit" ? (
+                <PenLine size={14} aria-hidden="true" />
+              ) : (
+                <ArrowUp size={14} aria-hidden="true" />
+              )}
+            </button>
           </div>
         </form>
       </div>

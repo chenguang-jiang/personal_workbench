@@ -464,17 +464,6 @@ export function AiImportChat() {
 
   return (
     <section className="ai-import-panel panel" aria-label="AI 智能导入">
-      {/* 顶部状态提示栏 */}
-      <div className="ai-import-header-badge">
-        <span className="ai-import-header-status">
-          <Sparkles size={14} className="text-amber-500" aria-hidden="true" />
-          <strong>全能智能导入</strong> · 统一处理文档附件、图片、正文与链接，外加语言指令
-        </span>
-        {!configured && (
-          <span className="ai-import-badge-warning">AI 尚未配置 API Key，将归档至待整理</span>
-        )}
-      </div>
-
       <div
         className={`ai-import-thread ${dragging ? "ai-import-drop-active" : ""}`}
         ref={threadRef}
@@ -490,20 +479,15 @@ export function AiImportChat() {
         }}
       >
         {turns.length === 0 && !draft && !archived && (
-          <div className="ai-import-start">
-            <Sparkles aria-hidden="true" />
-            <h2>把内容与要求交给我，一键整理入库。</h2>
-            <p>
-              支持上传 <strong>Markdown / 纯文本 / 代码等文档</strong> 与 <strong>图片截图</strong>，
-              直接粘贴正文或网页链接，外加你的<strong>语言与结构要求</strong>（如翻译、大纲梳理、提炼考点），
-              AI 自动生成出版级排版文章并归档进知识库。
-            </p>
-            <div className="ai-import-start-modes">
-              <span><FileText size={14} aria-hidden="true" />文档与附件</span>
-              <span><ImageIcon size={14} aria-hidden="true" />多图与截图</span>
-              <span><Globe size={14} aria-hidden="true" />语言要求与翻译</span>
-              <span><Link2 size={14} aria-hidden="true" />网页链接解析</span>
+          <div className="ai-import-hero">
+            <div className="ai-import-hero-pill">
+              <Sparkles size={13} className="text-amber-500" aria-hidden="true" />
+              <span>全能智能导入工作台</span>
             </div>
+            <h2>让外部资料，一步沉淀为知识库文章</h2>
+            <p>
+              拖入或上传文档与图片附件，或直接粘贴正文与网页链接。输入自定义语言与整理指令，AI 自动完成出版级排版并归档入库。
+            </p>
           </div>
         )}
 
@@ -652,88 +636,55 @@ export function AiImportChat() {
 
       {/* 统一输入工作台 */}
       <div className="ai-import-composer">
-        {/* 附件展示条 */}
-        {(images.length > 0 || docs.length > 0 || attaching) && (
-          <div className="ai-import-attach-bar">
-            {attaching && (
-              <span className="ai-import-attach-pending">
-                <Loader2 size={14} className="ai-spinner" aria-hidden="true" /> 附件解析保存中…
-              </span>
-            )}
-            {/* 文档附件芯片 */}
-            {docs.map((doc) => (
-              <span key={doc.name} className="ai-import-doc-chip">
-                <FileText size={14} aria-hidden="true" />
-                <span className="ai-import-doc-name" title={doc.name}>
-                  {doc.name}
+        <div className="ai-import-studio-card">
+          {/* 附件展示条 (在卡片内顶部) */}
+          {(images.length > 0 || docs.length > 0 || attaching) && (
+            <div className="ai-import-attach-bar">
+              {attaching && (
+                <span className="ai-import-attach-pending">
+                  <Loader2 size={13} className="ai-spinner" aria-hidden="true" /> 附件解析保存中…
                 </span>
-                <small>({Math.max(1, Math.round(doc.size / 1024))} KB)</small>
-                <button
-                  type="button"
-                  aria-label={`移除文档 ${doc.name}`}
-                  disabled={busy}
-                  onClick={() => setDocs((current) => current.filter((item) => item.name !== doc.name))}
-                >
-                  <X size={12} aria-hidden="true" />
-                </button>
-              </span>
-            ))}
-            {/* 图片附件芯片 */}
-            {images.map((image) => (
-              <span key={image.name} className="ai-import-attach-chip">
-                <img src={image.preview} alt={image.name} />
-                <button
-                  type="button"
-                  aria-label={`移除图片 ${image.name}`}
-                  disabled={busy}
-                  onClick={() => setImages((current) => current.filter((item) => item.name !== image.name))}
-                >
-                  <X size={12} aria-hidden="true" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+              )}
+              {docs.map((doc) => (
+                <span key={doc.name} className="ai-import-doc-chip">
+                  <FileText size={13} aria-hidden="true" />
+                  <span className="ai-import-doc-name" title={doc.name}>
+                    {doc.name}
+                  </span>
+                  <small>({Math.max(1, Math.round(doc.size / 1024))} KB)</small>
+                  <button
+                    type="button"
+                    aria-label={`移除文档 ${doc.name}`}
+                    disabled={busy}
+                    onClick={() => setDocs((current) => current.filter((item) => item.name !== doc.name))}
+                  >
+                    <X size={11} aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+              {images.map((image) => (
+                <span key={image.name} className="ai-import-attach-chip">
+                  <img src={image.preview} alt={image.name} />
+                  <button
+                    type="button"
+                    aria-label={`移除图片 ${image.name}`}
+                    disabled={busy}
+                    onClick={() => setImages((current) => current.filter((item) => item.name !== image.name))}
+                  >
+                    <X size={11} aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
 
-        {/* 语言要求与自定义指令输入 */}
-        <div className="ai-import-req-box">
-          <div className="ai-import-req-label">
-            <Sparkles size={14} className="text-amber-500" aria-hidden="true" />
-            <span>语言要求与整理提示（选填）：</span>
-          </div>
-          <input
-            className="ai-import-req-input"
-            value={languageReq}
-            onChange={(e) => setLanguageReq(e.target.value)}
-            placeholder="例如：翻译为中文并提炼架构图、整理为系统架构师复习大纲、按模块梳理考点..."
-            disabled={busy}
-          />
-          <div className="ai-import-presets">
-            {PROMPT_PRESETS.map((preset) => {
-              const Icon = preset.icon;
-              return (
-                <button
-                  key={preset.label}
-                  type="button"
-                  className="ai-import-preset-chip"
-                  onClick={() => setLanguageReq(preset.text)}
-                  disabled={busy}
-                >
-                  <Icon size={12} aria-hidden="true" />
-                  <span>{preset.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 主输入区（正文或链接） */}
-        <div className="ai-import-composer-row">
+          {/* 主输入区（正文或链接） */}
           <textarea
             ref={composerRef}
+            className="ai-import-main-input"
             rows={3}
             value={input}
-            placeholder="粘贴正文内容、Markdown 文本、输入网页公开链接（https://...），或拖入附件文件…"
+            placeholder="粘贴正文、Markdown 文本、输入网页公开链接 (https://...)，或直接拖拽文件到这里…"
             aria-label="导入内容或对话"
             disabled={busy}
             onChange={(event) => setInput(event.target.value)}
@@ -755,80 +706,120 @@ export function AiImportChat() {
             }}
           />
 
-          <div className="ai-import-composer-actions">
-            {/* 隐藏文件选择器 */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".md,.txt,.json,.csv,.docx,.pdf,image/png,image/jpeg,image/gif,image/webp,image/bmp"
-              multiple
-              className="sr-only"
-              aria-label="添加附件"
-              onChange={(event) => {
-                void handleFiles(Array.from(event.target.files || []));
-                event.target.value = "";
-              }}
-            />
+          {/* 语言要求与快捷指令 (整合在卡片内) */}
+          <div className="ai-import-directive-row">
+            <div className="ai-import-directive-input-wrap">
+              <Sparkles size={13} className="ai-import-directive-icon" aria-hidden="true" />
+              <input
+                className="ai-import-directive-input"
+                value={languageReq}
+                onChange={(e) => setLanguageReq(e.target.value)}
+                placeholder="语言要求与整理指令（选填）：如“翻译为中文并按模块梳理考点”、“提炼核心代码”..."
+                disabled={busy}
+              />
+            </div>
+            <div className="ai-import-presets">
+              {PROMPT_PRESETS.map((preset) => {
+                const Icon = preset.icon;
+                const isSelected = languageReq === preset.text;
+                return (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    className={`ai-import-preset-chip ${isSelected ? "is-selected" : ""}`}
+                    onClick={() => setLanguageReq(isSelected ? "" : preset.text)}
+                    disabled={busy}
+                  >
+                    <Icon size={12} aria-hidden="true" />
+                    <span>{preset.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-            <button
-              type="button"
-              className="button button-secondary ai-import-attach"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={busy || attaching || images.length + docs.length >= ATTACH_MAX_COUNT}
-              title={`上传附件（支持 Markdown、TXT 文档与各种图片截图，最多 ${ATTACH_MAX_COUNT} 个）`}
-              aria-label="上传附件"
-            >
-              {attaching ? (
-                <Loader2 size={16} className="ai-spinner" aria-hidden="true" />
-              ) : (
-                <Paperclip size={16} aria-hidden="true" />
+          {/* 卡片底部操作栏 */}
+          <div className="ai-import-bottom-bar">
+            <div className="ai-import-bottom-left">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".md,.txt,.json,.csv,.docx,.pdf,image/png,image/jpeg,image/gif,image/webp,image/bmp"
+                multiple
+                className="sr-only"
+                aria-label="添加附件"
+                onChange={(event) => {
+                  void handleFiles(Array.from(event.target.files || []));
+                  event.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                className="button button-secondary ai-import-attach-btn"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy || attaching || images.length + docs.length >= ATTACH_MAX_COUNT}
+                title={`上传附件（支持 Markdown、TXT 文档与图片，最多 ${ATTACH_MAX_COUNT} 个）`}
+                aria-label="上传附件"
+              >
+                {attaching ? (
+                  <Loader2 size={14} className="ai-spinner" aria-hidden="true" />
+                ) : (
+                  <Paperclip size={14} aria-hidden="true" />
+                )}
+                <span>添加附件</span>
+              </button>
+
+              {(images.length > 0 || docs.length > 0) && (
+                <span className="ai-import-count-tag">
+                  已选 {images.length + docs.length} 个附件
+                </span>
               )}
-            </button>
 
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={() => sendText(input)}
-              disabled={!canSend}
-              title="与 AI 交流讨论 / 审阅调整"
-              aria-label="发送对话"
-            >
-              <Send size={15} aria-hidden="true" />
-              <span className="hidden sm:inline">讨论</span>
-            </button>
+              {(turns.length > 0 || input || images.length > 0 || docs.length > 0 || draft) && (
+                <button
+                  type="button"
+                  className="ai-import-clear-btn"
+                  onClick={resetAll}
+                  disabled={busy}
+                  title="清空当前输入与对话"
+                >
+                  <Trash2 size={13} aria-hidden="true" /> 清空
+                </button>
+              )}
+            </div>
 
-            <button
-              type="button"
-              className="button button-primary ai-import-direct-btn"
-              onClick={() => void executeDirectArchive()}
-              disabled={!canSend || !archiveEnabled}
-              title="根据附件、内容与语言要求，直接生成文章并归档入库"
-              aria-label="一键归档入库"
-            >
-              <Sparkles size={15} aria-hidden="true" />
-              <span>一键 AI 归档</span>
-            </button>
+            <div className="ai-import-bottom-right">
+              <button
+                type="button"
+                className="button button-secondary ai-import-chat-btn"
+                onClick={() => sendText(input)}
+                disabled={!canSend}
+                title="先与 AI 交流讨论 / 审阅草稿"
+                aria-label="发送对话"
+              >
+                <Send size={14} aria-hidden="true" />
+                <span>AI 讨论审阅</span>
+              </button>
+
+              <button
+                type="button"
+                className="button button-primary ai-import-direct-btn"
+                onClick={() => void executeDirectArchive()}
+                disabled={!canSend || !archiveEnabled}
+                title="根据附件、内容与语言要求，直接生成文章并归档入库 (⌘ + Enter)"
+                aria-label="一键归档入库"
+              >
+                <Sparkles size={14} aria-hidden="true" />
+                <span>一键 AI 归档</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* 底部提示与辅助操作 */}
-        <div className="ai-import-composer-foot">
-          <p className="ai-import-hint">
-            支持拖入文档（.md/.txt 等）与图片 · ⌘+Enter 快捷一键归档
-            {vision ? " · 模型支持视觉图文解析" : " · 附带图片将自动嵌入正文引用"}
-          </p>
-          {(turns.length > 0 || input || images.length > 0 || docs.length > 0 || draft) && (
-            <button
-              type="button"
-              className="ai-import-clear-btn"
-              onClick={resetAll}
-              disabled={busy}
-              title="清空当前输入与对话，开启全新导入"
-            >
-              <Trash2 size={13} aria-hidden="true" /> 清空重置
-            </button>
-          )}
-        </div>
+        <p className="ai-import-hint">
+          支持直接拖入文档与图片 · 快捷键 <code>⌘ + Enter</code> 一键归档
+          {vision ? " · 模型支持图文多模态解析" : " · 图片附件将自动嵌入正文引用"}
+        </p>
       </div>
     </section>
   );

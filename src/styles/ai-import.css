@@ -24,6 +24,46 @@
   gap: 14px;
 }
 
+.ai-import-hero {
+  margin: auto;
+  max-width: 540px;
+  text-align: center;
+  padding: 42px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ai-import-hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-accent-purple) 8%, var(--color-surface));
+  border: 1px solid color-mix(in oklab, var(--color-accent-purple) 20%, transparent);
+  color: var(--color-accent-purple-dark);
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+
+.ai-import-hero h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+}
+
+.ai-import-hero p {
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--color-secondary);
+  max-width: 480px;
+  margin: 0;
+}
+
 .ai-import-start {
   margin: auto;
   max-width: 460px;
@@ -186,36 +226,45 @@
 
 .ai-import-composer {
   border-top: 1px solid var(--color-border);
-  padding: 14px 28px 16px;
+  padding: 14px 24px 14px;
   background: var(--color-surface);
 }
 
-.ai-import-composer-row {
+.ai-import-studio-card {
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
+  flex-direction: column;
+  background: var(--color-base);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 14px;
+  padding: 12px 14px 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
-.ai-import-composer textarea {
-  flex: 1;
-  resize: none;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
-  font: inherit;
-  font-size: 14px;
-  line-height: 1.6;
-  background: var(--color-base);
+.ai-import-studio-card:focus-within {
+  border-color: var(--color-accent-purple);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent-purple) 18%, transparent), 0 4px 16px rgba(0, 0, 0, 0.05);
+  background: var(--color-surface);
+}
+
+.ai-import-main-input {
+  width: 100%;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  resize: vertical;
+  min-height: 60px;
+  max-height: 220px;
+  padding: 2px 2px 8px;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.65;
   color: var(--color-primary);
 }
 
-.ai-import-composer textarea:focus {
-  outline: 2px solid var(--color-accent-lilac);
-  border-color: var(--color-accent-purple);
-}
-
-.ai-import-send {
-  padding: 10px 14px;
+.ai-import-main-input::placeholder {
+  color: var(--color-tertiary);
 }
 
 /* 空态的三种输入方式提示 */
@@ -308,29 +357,6 @@
   cursor: pointer;
 }
 
-.ai-import-composer-actions {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.ai-import-attach {
-  padding: 10px 12px;
-}
-
-.ai-import-composer-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 10px;
-}
-
-.ai-import-hint {
-  font-size: 11px;
-  color: var(--color-tertiary);
-}
-
 @media (max-width: 720px) {
   .ai-import-turn {
     max-width: 92%;
@@ -338,8 +364,22 @@
 
   .ai-import-thread,
   .ai-import-composer {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .ai-import-bottom-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .ai-import-bottom-left {
+    justify-content: space-between;
+  }
+
+  .ai-import-bottom-right {
+    justify-content: flex-end;
   }
 }
 
@@ -481,41 +521,44 @@
   color: #fff;
 }
 
-/* 语言要求与自定义指令区 */
-.ai-import-req-box {
+/* 语言要求与自定义指令区 (嵌入 studio-card 内部) */
+.ai-import-directive-row {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: color-mix(in oklab, var(--color-surface) 94%, var(--color-elevated));
-  border: 1px dashed var(--color-border);
+  gap: 7px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: color-mix(in oklab, var(--color-surface) 60%, var(--color-hover));
+  border-radius: 9px;
+  border: 1px solid color-mix(in oklab, var(--color-border) 70%, transparent);
 }
 
-.ai-import-req-label {
-  display: inline-flex;
+.ai-import-directive-input-wrap {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-secondary);
+  gap: 7px;
 }
 
-.ai-import-req-input {
-  width: 100%;
-  padding: 7px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-primary);
+.ai-import-directive-icon {
+  flex-shrink: 0;
+  color: var(--color-accent-purple);
+}
+
+.ai-import-directive-input {
+  flex: 1;
+  border: none !important;
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font-family: inherit;
   font-size: 12.5px;
-  outline: none;
-  transition: border-color 150ms ease;
+  color: var(--color-primary);
+  padding: 0;
 }
 
-.ai-import-req-input:focus {
-  border-color: var(--color-accent-purple);
+.ai-import-directive-input::placeholder {
+  color: var(--color-tertiary);
+  font-size: 12px;
 }
 
 .ai-import-presets {
@@ -527,8 +570,8 @@
 .ai-import-preset-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
+  gap: 4px;
+  padding: 2.5px 9px;
   border-radius: 999px;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -536,6 +579,7 @@
   font-size: 11.5px;
   cursor: pointer;
   transition: all 140ms ease;
+  user-select: none;
 }
 
 .ai-import-preset-chip:hover {
@@ -544,15 +588,61 @@
   background: var(--color-accent-lilac);
 }
 
-.ai-import-direct-btn {
-  background: linear-gradient(135deg, var(--color-accent-purple) 0%, var(--color-accent-purple-dark) 100%) !important;
-  color: #fff !important;
-  border: 0 !important;
-  box-shadow: 0 2px 8px color-mix(in oklab, var(--color-accent-purple) 25%, transparent);
+.ai-import-preset-chip.is-selected {
+  border-color: var(--color-accent-purple);
+  background: var(--color-accent-purple);
+  color: #fff;
+  font-weight: 500;
 }
 
-.ai-import-direct-btn:hover {
-  filter: brightness(1.08);
+/* 卡片底部工具栏 */
+.ai-import-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in oklab, var(--color-border) 60%, transparent);
+}
+
+.ai-import-bottom-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-import-bottom-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-import-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px !important;
+  font-size: 12.5px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--color-border) !important;
+  background: var(--color-surface) !important;
+  color: var(--color-secondary) !important;
+  transition: all 140ms ease;
+}
+
+.ai-import-attach-btn:hover:not(:disabled) {
+  border-color: var(--color-accent-purple) !important;
+  color: var(--color-accent-purple-dark) !important;
+}
+
+.ai-import-count-tag {
+  font-size: 11.5px;
+  color: var(--color-accent-purple-dark);
+  background: var(--color-accent-lilac);
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-weight: 500;
 }
 
 .ai-import-clear-btn {
@@ -562,12 +652,64 @@
   background: none;
   border: 0;
   color: var(--color-tertiary);
-  font-size: 11.5px;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 6px;
   cursor: pointer;
+  transition: color 120ms ease;
 }
 
 .ai-import-clear-btn:hover {
   color: var(--color-danger);
+}
+
+.ai-import-chat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px !important;
+  font-size: 12.5px !important;
+  border-radius: 8px !important;
+  font-weight: 500;
+}
+
+.ai-import-direct-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 15px !important;
+  font-size: 12.5px !important;
+  border-radius: 8px !important;
+  font-weight: 500;
+  background: linear-gradient(135deg, var(--color-accent-purple) 0%, var(--color-accent-purple-dark) 100%) !important;
+  color: #fff !important;
+  border: 0 !important;
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--color-accent-purple) 25%, transparent);
+  transition: filter 140ms ease, transform 100ms ease;
+}
+
+.ai-import-direct-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-0.5px);
+}
+
+.ai-import-direct-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.ai-import-hint {
+  font-size: 11.5px;
+  color: var(--color-tertiary);
+  text-align: center;
+  margin-top: 8px;
+}
+
+.ai-import-hint code {
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border);
 }
 
 /* 归档成功卡片 */
